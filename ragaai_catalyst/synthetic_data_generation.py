@@ -8,6 +8,8 @@ import csv
 import markdown
 import pandas as pd
 import json
+import proxy_call
+import ast
 
 dotenv.load_dotenv()
 
@@ -20,11 +22,11 @@ class SyntheticDataGeneration:
         """
         Initialize the SyntheticDataGeneration class with API clients for Groq, Gemini, and OpenAI.
         """
-        self.groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+        # self.groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
         genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
         openai.api_key = os.getenv("OPENAI_API_KEY")
 
-    def generate_question(self, text, question_type="simple", model="gpt-4o-mini", provider="openai", n=5):
+    def generate_qna(self, text, question_type="simple", model="gpt-4o-mini", provider="openai", n=5,api_base=None,model_config=dict()):
         """
         Generate questions based on the given text using the specified model and provider.
 
@@ -47,7 +49,15 @@ class SyntheticDataGeneration:
         if provider == "groq":
             return self._generate_groq(text, system_message, model)
         elif provider == "gemini":
-            return self._generate_gemini(text, system_message, model)
+            if api_base is None:
+                return self._generate_gemini(text, system_message, model)
+            else:
+                messages=[
+                {'role': 'user', 'content': system_message+text}
+            ]
+                a= proxy_call.api_completion(messages=messages ,model=model ,api_base=api_base)
+                b= ast.literal_eval(a[0])
+                return pd.DataFrame(b)
         elif provider == "openai":
             return self._generate_openai(text, system_message, model)
         else:
@@ -74,7 +84,7 @@ class SyntheticDataGeneration:
                 Each object in list should have Question and corresponding answer.
                 Do not return any extra strings. Return Generated text strictly in below format.  
                 [{{"Question":"question,"Answer":"answer"}}]
-             '''
+            '''
         elif question_type == 'mcq':
             return f'''Generate a set of {n} questions with 4 probable answers from the given text. 
                 The options should not be longer than a phrase. There should be only 1 correct answer.
@@ -170,7 +180,11 @@ class SyntheticDataGeneration:
         elif provider == "gemini":
             data = response.candidates[0].content.parts[0].text
         elif provider == "groq":
-            data = response.choices[0].message.content
+            data = response.choices[0].message.content.replace('\n', '')
+            list_start_index = data.find('[')  # Find the index of the first '['
+            substring_data = data[list_start_index:] if list_start_index != -1 else data  # Slice from the list start
+            data = substring_data
+
         else:
             raise ValueError("Invalid provider. Choose 'groq', 'gemini', or 'openai'.")
         try:
@@ -275,7 +289,7 @@ class SyntheticDataGeneration:
                 text += " ".join(row) + "\n"
         return text
 
-    def get_supported_question_types(self):
+    def get_supported_qna(self):
         """
         Get a list of supported question types.
 

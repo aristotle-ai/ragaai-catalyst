@@ -4,5 +4,5 @@ from .tracers import Tracer
 from .utils import response_checker
 from .dataset import Dataset
 from .prompt_manager import PromptManager
-
+from .synthetic_data_generation import SyntheticDataGeneration
 __all__ = ["Experiment", "RagaAICatalyst", "Tracer", "PromptManager"]
