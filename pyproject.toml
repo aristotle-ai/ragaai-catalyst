@@ -39,7 +39,7 @@ dependencies = [
     "google-generativeai>=0.8.2",
     "Markdown>=3.7",    
     "tenacity>=8.3.0",
-    "PyCryptodome>=pycryptodome",
+    "pycryptodome>=3.21.0",
 ]
 
 [project.optional-dependencies]
