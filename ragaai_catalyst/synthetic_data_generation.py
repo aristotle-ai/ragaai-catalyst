@@ -61,7 +61,15 @@ class SyntheticDataGeneration:
             ]
                 a= proxy_call.api_completion(messages=messages ,model=model ,api_base=api_base)
                 b= ast.literal_eval(a[0])
-                return pd.DataFrame(b)
+                df = pd.DataFrame(b)
+                if len(df) >= n:
+                    return df.head(n)
+                while len(df) < n:
+                    c = proxy_call.api_completion(messages=messages ,model=model ,api_base=api_base)
+                    d = ast.literal_eval(c[0])
+                    df1 = pd.DataFrame(d)
+                    df = pd.concat([df, df1], ignore_index=True)
+                return df.head(n)
         elif provider == "openai":
             if api_key is None and os.getenv("OPENAI_API_KEY") is None:
                 raise ValueError("API key must be provided for OpenAI.")
@@ -215,24 +223,34 @@ class SyntheticDataGeneration:
             ValueError: If the input is neither a valid file path nor a string of text.
         """
         if isinstance(input_data, str):
-            if os.path.isfile(input_data):
-                # If input_data is a file path
-                _, file_extension = os.path.splitext(input_data)
-                if file_extension.lower() == '.pdf':
-                    return self._read_pdf(input_data)
-                elif file_extension.lower() == '.txt':
-                    return self._read_text(input_data)
-                elif file_extension.lower() == '.md':
-                    return self._read_markdown(input_data)
-                elif file_extension.lower() == '.csv':
-                    return self._read_csv(input_data)
+            # Check if input_data is intended to be a file path
+            if os.path.sep in input_data or input_data.endswith(('.pdf', '.txt', '.md', '.csv')):
+                # If the string contains a path separator or a file extension, treat it as a potential path
+                if os.path.exists(input_data):
+                    if os.path.isfile(input_data):
+                        # If input_data is a valid file path
+                        _, file_extension = os.path.splitext(input_data)
+                        if file_extension.lower() == '.pdf':
+                            return self._read_pdf(input_data)
+                        elif file_extension.lower() == '.txt':
+                            return self._read_text(input_data)
+                        elif file_extension.lower() == '.md':
+                            return self._read_markdown(input_data)
+                        elif file_extension.lower() == '.csv':
+                            return self._read_csv(input_data)
+                        else:
+                            raise ValueError(f"Unsupported file type: {file_extension}")
+                    else:
+                        raise ValueError(f"The path exists but it's not a file: {input_data}")
                 else:
-                    raise ValueError(f"Unsupported file type: {file_extension}")
+                    # If it looks like a path but doesn't exist, raise an error
+                    raise FileNotFoundError(f"File path does not exist: {input_data}")
             else:
-                # If input_data is a string of text
+                # If it doesn't look like a path, treat it as plain text
                 return input_data
         else:
-            raise ValueError("Input must be either a file path or a string of text")
+            # Raise error if input_data is not a string
+            raise TypeError("Input data must be a string representing either text or a file path")
 
     def _read_pdf(self, file_path):
         """
