@@ -1,14 +1,13 @@
 import os
-from sys import exception
-
-import requests
+from .tracers.agentic_tracing.upload.session_manager import session_manager
 import json
 import re
-import logging
-import uuid
-from typing import Optional, List, Dict, Any
 from .ragaai_catalyst import RagaAICatalyst
 import copy
+import logging
+from urllib3.exceptions import PoolError, MaxRetryError, NewConnectionError
+from requests.exceptions import ConnectionError, Timeout, RequestException
+from http.client import RemoteDisconnected
 
 logger = logging.getLogger(__name__)
 
@@ -17,95 +16,123 @@ class PromptManager:
     TIMEOUT = 10
 
     def __init__(self, project_name):
+        """
+        Initialize the PromptManager with a project name.
+
+        Args:
+            project_name (str): The name of the project.
+
+        Raises:
+            ValueError: If the project is not found.
+        """
         self.project_name = project_name
         self.base_url = f"{RagaAICatalyst.BASE_URL}/playground/prompt"
         self.timeout = 10
-        self.size = 99999
+        self.size = 99999 #Number of projects to fetch
+        self.project_id = None
+        self.headers = {}
 
-        token = os.getenv("RAGAAI_CATALYST_TOKEN")
-        if not token:
-            raise EnvironmentError("RAGAAI_CATALYST_TOKEN is not set in environment variables")
-
-        self.headers = {"Authorization": f"Bearer {token}"}
-
-        # 1. Fetch Project List
         try:
-            url = f"{RagaAICatalyst.BASE_URL}/v2/llm/projects?size={self.size}"
-            response = requests.get(url, headers=self.headers, timeout=self.timeout)
+            response = session_manager.make_request_with_retry(
+                "GET",
+                f"{RagaAICatalyst.BASE_URL}/v2/llm/projects?size={self.size}",
+                headers={
+                    "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
+                },
+                timeout=self.timeout,
+            )
             response.raise_for_status()
-        except requests.exceptions.Timeout:
-            raise TimeoutError("Timed out while fetching project list")
-        except requests.exceptions.RequestException as e:
-            raise ConnectionError(f"Failed to fetch project list: {str(e)}")
+            # logger.debug("Projects list retrieved successfully")
 
-        # 2. Parse JSON Response
-        try:
-            data = response.json()
-            projects = data["data"]["content"]
-            if not isinstance(projects, list):
-                raise ValueError("Invalid project list format received from server")
-        except (KeyError, json.JSONDecodeError):
-            raise ValueError("Unexpected response structure while parsing project list")
+            project_list = [
+                project["name"] for project in response.json()["data"]["content"]
+            ]
+            self.project_id = [
+            project["id"] for project in response.json()["data"]["content"] if project["name"]==project_name
+            ][0]
 
-        # 3. Validate project_name and extract project_id
-        project_list = [p.get("name") for p in projects]
+        except (PoolError, MaxRetryError, NewConnectionError, ConnectionError, Timeout, RemoteDisconnected) as e:
+            session_manager.handle_request_exceptions(e, "fetching project list")
+            logger.error(f"Failed to fetch project list, PromptManager will have limited functionality")
+            return
+        except RequestException as e:
+            logger.error(f"Error while fetching project list: {e}")
+            logger.error(f"PromptManager will have limited functionality")
+            return
+        except (KeyError, json.JSONDecodeError) as e:
+            logger.error(f"Error parsing project list: {str(e)}")
+            return
+
         if self.project_name not in project_list:
-            raise ValueError(f"Project '{self.project_name}' not found. Please provide a valid project name.")
+            logger.error("Project not found. Please enter a valid project name")
+            return
 
-        matching_projects = [p["id"] for p in projects if p.get("name") == self.project_name]
-        if not matching_projects:
-            raise ValueError(f"Project ID for '{self.project_name}' not found in response")
-        self.project_id = matching_projects[0]
+        self.headers = {
+                "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
+                "X-Project-Id": str(self.project_id)
+            }
 
-        self.headers["X-Project-Id"] = str(self.project_id)
 
     def list_prompts(self):
+        if not self.project_id:
+            logger.error("PromptManager not properly initialized, cannot list prompts")
+            return []
+
         prompt = Prompt()
         try:
             prompt_list = prompt.list_prompts(self.base_url, self.headers, self.timeout)
             return prompt_list
-        except requests.RequestException as e:
-            raise requests.RequestException(f"Error listing prompts: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error listing prompts: {str(e)}")
+            return []
     
     def get_prompt(self, prompt_name, version=None):
         try:
             prompt_list = self.list_prompts()
-        except requests.RequestException as e:
-            raise requests.RequestException(f"Error fetching prompt list: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error fetching prompt list: {str(e)}")
+            return None
 
         if prompt_name not in prompt_list:
-            raise ValueError("Prompt not found. Please enter a valid prompt name")
+            logger.error("Prompt not found. Please enter a valid prompt name")
+            return None
 
         try:
             prompt_versions = self.list_prompt_versions(prompt_name)
-        except requests.RequestException as e:
-            raise requests.RequestException(f"Error fetching prompt versions: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error fetching prompt versions: {str(e)}")
+            return None
 
         if version and version not in prompt_versions.keys():
-            raise ValueError("Version not found. Please enter a valid version name")
+            logger.error("Version not found. Please enter a valid version name")
+            return None
 
         prompt = Prompt()
         try:
             prompt_object = prompt.get_prompt(self.base_url, self.headers, self.timeout, prompt_name, version)
             return prompt_object
-        except requests.RequestException as e:
-            raise requests.RequestException(f"Error fetching prompt: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error fetching prompt: {str(e)}")
+            return None
 
     def list_prompt_versions(self, prompt_name):
         try:
             prompt_list = self.list_prompts()
-        except requests.RequestException as e:
-            raise requests.RequestException(f"Error fetching prompt list: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error fetching prompt list: {str(e)}")
+            return {}
 
         if prompt_name not in prompt_list:
-            raise ValueError("Prompt not found. Please enter a valid prompt name")
-
+            logger.error("Prompt not found. Please enter a valid prompt name")
+            return {}
+        
         prompt = Prompt()
         try:
             prompt_versions = prompt.list_prompt_versions(self.base_url, self.headers, self.timeout, prompt_name)
             return prompt_versions
-        except requests.RequestException as e:
-            raise requests.RequestException(f"Error fetching prompt versions: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error fetching prompt versions: {str(e)}")
+            return {}
 
     def _create_prompt(self, prompt_name: str, directory: Optional[str] = None) -> Optional[Dict[str, Any]]:
         if not prompt_name or not prompt_name.strip():
@@ -235,7 +262,7 @@ class PromptManager:
             )
             response.raise_for_status()
             data = response.json()
-            
+
             if data.get("success") and "data" in data:
                 return [model["name"] for model in data["data"]]
             return []
@@ -253,7 +280,7 @@ class PromptManager:
             )
             response.raise_for_status()
             data = response.json()
-            
+
             if data.get("success") and "data" in data:
                 parameters = []
                 for param in data["data"]:
@@ -283,19 +310,19 @@ class PromptManager:
     ) -> Dict[str, Any]:
         if not prompt_name or not prompt_name.strip():
             raise ValueError("Prompt name cannot be empty")
-        
+
         if not message or not message.strip():
             message = f"commit#{uuid.uuid4().hex[:8]}"
             logger.info(f"No message provided, auto-generated: {message}")
 
         if not isinstance(text_fields, list) or not text_fields:
             raise ValueError("text_fields must be a non-empty list")
-        
+
         valid_roles = ['system', 'user', 'assistant']
         for idx, field in enumerate(text_fields):
             if not isinstance(field, dict) or 'role' not in field or 'content' not in field:
                 raise ValueError("Each text_field must be a dict with 'role' and 'content' keys")
-            
+
             role = field.get('role')
             if role not in valid_roles:
                 raise ValueError(
@@ -309,17 +336,17 @@ class PromptManager:
 
         if not model or not isinstance(model, str) or not model.strip():
             raise ValueError("Model must be a non-empty string")
-        
+
         valid_model_prefixes = [
             "openai/", "azure/", "bedrock/", "gemini/", "anthropic/", "vertex_ai/"
         ]
-        
+
         if "/" not in model:
             raise ValueError(
                 f"Model must be in format 'provider/model-name' (e.g., 'openai/gpt-4o'). "
                 f"Supported providers: {', '.join([p.rstrip('/') for p in valid_model_prefixes])}"
             )
-        
+
         model = model.lower()
         if not any(model.startswith(prefix) for prefix in valid_model_prefixes):
             raise ValueError(
@@ -329,7 +356,7 @@ class PromptManager:
 
         provider_name = model.split('/')[0]
         model_name = model.split('/', 1)[1] if '/' in model else ""
-        
+
         supported_models = self._get_supported_models(provider_name)
         if supported_models and model_name not in supported_models:
             raise ValueError(
@@ -420,59 +447,85 @@ class Prompt:
 
     def list_prompts(self, url, headers, timeout):
         try:
-            response = requests.get(url, headers=headers, timeout=timeout)
+            response = session_manager.make_request_with_retry("GET", url, headers=headers, timeout=timeout)
             response.raise_for_status()
             prompt_list = [prompt["name"] for prompt in response.json()["data"]]                        
             return prompt_list
-        except requests.RequestException as e:
-            raise requests.RequestException(f"Error listing prompts: {str(e)}")
+        except (PoolError, MaxRetryError, NewConnectionError, ConnectionError, Timeout, RemoteDisconnected) as e:
+            session_manager.handle_request_exceptions(e, "listing prompts")
+            return []
+        except RequestException as e:
+            logger.error(f"Error while listing prompts: {e}")
+            return []
         except (KeyError, json.JSONDecodeError) as e:
-            raise ValueError(f"Error parsing prompt list: {str(e)}")
+            logger.error(f"Error parsing prompt list: {str(e)}")
+            return []
 
     def _get_response_by_version(self, base_url, headers, timeout, prompt_name, version):
         try:
-            response = requests.get(f"{base_url}/version/{prompt_name}?version={version}",
+            response = session_manager.make_request_with_retry("GET", f"{base_url}/version/{prompt_name}?version={version}",
                                     headers=headers, timeout=timeout)
             response.raise_for_status()
-        except requests.RequestException as e:
-            raise requests.RequestException(f"Error fetching prompt version: {str(e)}")
+            return response
+        except (PoolError, MaxRetryError, NewConnectionError, ConnectionError, Timeout, RemoteDisconnected) as e:
+            session_manager.handle_request_exceptions(e, f"fetching prompt version {version} for {prompt_name}")
+            return None
+        except RequestException as e:
+            logger.error(f"Error while fetching prompt version {version} for {prompt_name}: {e}")
+            return None
         except (KeyError, json.JSONDecodeError, IndexError) as e:
-            raise ValueError(f"Error parsing prompt version: {str(e)}")
-        return response
+            logger.error(f"Error parsing prompt version: {str(e)}")
+            return None
 
     def _get_response(self, base_url, headers, timeout, prompt_name):
         try:
-            response = requests.get(f"{base_url}/version/{prompt_name}",
+            response = session_manager.make_request_with_retry("GET", f"{base_url}/version/{prompt_name}",
                                 headers=headers, timeout=timeout)
             response.raise_for_status()
-        except requests.RequestException as e:
-            raise requests.RequestException(f"Error fetching prompt version: {str(e)}")
+            return response
+        except (PoolError, MaxRetryError, NewConnectionError, ConnectionError, Timeout, RemoteDisconnected) as e:
+            session_manager.handle_request_exceptions(e, f"fetching latest prompt version for {prompt_name}")
+            return None
+        except RequestException as e:
+            logger.error(f"Error while fetching latest prompt version for {prompt_name}: {e}")
+            return None
         except (KeyError, json.JSONDecodeError, IndexError) as e:
-            raise ValueError(f"Error parsing prompt version: {str(e)}")
-        return response
+            logger.error(f"Error parsing prompt version: {str(e)}")
+            return None
 
     def _get_prompt_by_version(self, base_url, headers, timeout, prompt_name, version):
         response = self._get_response_by_version(base_url, headers, timeout, prompt_name, version)
-        prompt_text = response.json()["data"]["docs"][0]["textFields"]
-        return prompt_text
+        if response is None:
+            return ""
+        try:
+            prompt_text = response.json()["data"]["docs"][0]["textFields"]
+            return prompt_text
+        except (KeyError, json.JSONDecodeError, IndexError) as e:
+            logger.error(f"Error parsing prompt text: {str(e)}")
+            return ""
 
     def get_prompt(self, base_url, headers, timeout, prompt_name, version=None):
         if version:
             response = self._get_response_by_version(base_url, headers, timeout, prompt_name, version)
-            prompt_text = response.json()["data"]["docs"][0]["textFields"]
-            prompt_parameters = response.json()["data"]["docs"][0]["modelSpecs"]["parameters"]
-            model = response.json()["data"]["docs"][0]["modelSpecs"]["model"]
         else:
             response = self._get_response(base_url, headers, timeout, prompt_name)
+
+        if response is None:
+            return None
+
+        try:
             prompt_text = response.json()["data"]["docs"][0]["textFields"]
             prompt_parameters = response.json()["data"]["docs"][0]["modelSpecs"]["parameters"]
             model = response.json()["data"]["docs"][0]["modelSpecs"]["model"]
-        return PromptObject(prompt_text, prompt_parameters, model)
+            return PromptObject(prompt_text, prompt_parameters, model)
+        except (KeyError, json.JSONDecodeError, IndexError) as e:
+            logger.error(f"Error parsing prompt data: {str(e)}")
+            return None
 
 
     def list_prompt_versions(self, base_url, headers, timeout, prompt_name):
         try:
-            response = requests.get(f"{base_url}/{prompt_name}/version",
+            response = session_manager.make_request_with_retry("GET", f"{base_url}/{prompt_name}/version",
                                     headers=headers, timeout=timeout)
             response.raise_for_status()
             version_names = [version["name"] for version in response.json()["data"]]
@@ -480,10 +533,15 @@ class Prompt:
             for version in version_names:
                 prompt_versions[version] = self._get_prompt_by_version(base_url, headers, timeout, prompt_name, version)
             return prompt_versions
-        except requests.RequestException as e:
-            raise requests.RequestException(f"Error listing prompt versions: {str(e)}")
+        except (PoolError, MaxRetryError, NewConnectionError, ConnectionError, Timeout, RemoteDisconnected) as e:
+            session_manager.handle_request_exceptions(e, f"listing prompt versions for {prompt_name}")
+            return {}
+        except RequestException as e:
+            logger.error(f"Error while listing prompt versions for {prompt_name}: {e}")
+            return {}
         except (KeyError, json.JSONDecodeError) as e:
-            raise ValueError(f"Error parsing prompt versions: {str(e)}")
+            logger.error(f"Error parsing prompt versions: {str(e)}")
+            return {}
 
 
 class PromptObject:
