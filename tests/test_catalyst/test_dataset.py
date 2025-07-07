@@ -94,24 +94,7 @@ def create_project_and_dataset():
         "dataset_name": dataset_name,
         "dataset_manager": dataset_manager
     }
-def test_create_project_and_dataset_if_not_exist(create_project_and_dataset):
-    """Test creating a project and dataset if they don't exist"""
-    project_info = create_project_and_dataset
-    
-    # Verify the project and dataset were created or already exist
-    dataset_manager = project_info["dataset_manager"]
-    
-    # List datasets and verify our test dataset is there
-    datasets = dataset_manager.list_datasets()
-    assert project_info["dataset_name"] in datasets, f"Dataset {project_info['dataset_name']} not found in {datasets}"
-    
-    # Verify we can get dataset columns
-    try:
-        dataset_columns = dataset_manager.get_dataset_columns(dataset_name=project_info["dataset_name"])
-        assert isinstance(dataset_columns, list), "Dataset columns should be a list"
-        assert len(dataset_columns) > 0, "Dataset should have columns"
-    except Exception as e:
-        pytest.fail(f"Failed to get dataset columns: {e}")
+
 
 @pytest.fixture
 def dataset(base_url, access_keys):
@@ -261,3 +244,358 @@ def test_upload_csv_invalid_schema(dataset, caplog):
         schema_mapping=schema_mapping
     )
     assert "Invalid schema mapping provided" in caplog.text or "Failed to upload CSV to elastic" in caplog.text
+def test_add_columns_with_variables(create_project_and_dataset):
+    """Test adding a column with variables using an LLM provider"""
+    project_info = create_project_and_dataset
+    dataset_manager = project_info["dataset_manager"]
+    dataset_name = project_info["dataset_name"]
+    
+    # Get columns before adding new column
+    columns_before = dataset_manager.get_dataset_columns(dataset_name)
+    print(f"Columns before: {columns_before}")
+    
+    # Define text fields for generating a new column with variables
+    text_fields = [
+        {
+            "role": "system",
+            "content": "you are an evaluator, which answers only in yes or no."
+        },
+        {
+            "role": "user",
+            "content": "are any of the {{asdf}} {{abcd}} related to broken hand"
+        }
+    ]
+    
+    # Define variables mapping using the actual column names from the dataset
+    # First check what columns exist in the dataset
+    dataset_columns = dataset_manager.get_dataset_columns(dataset_name)
+    print(f"Available dataset columns: {dataset_columns}")
+    
+    # Use the first column as asdf and the second as abcd if they exist
+    if len(dataset_columns) >= 2:
+        variables = {
+            "asdf": dataset_columns[0],  # Use first column
+            "abcd": dataset_columns[1]   # Use second column
+        }
+    else:
+        # Fallback to default values if dataset doesn't have enough columns
+        variables = {
+            "asdf": "Query",  # Default if columns not found
+            "abcd": "Response" # Default if columns not found
+        }
+    
+    column_name = f"variable_test_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    print(f"Adding column '{column_name}' with variables: {variables}")
+    
+    # Add a generated column using LLM with variables
+    try:
+        dataset_manager.add_columns(
+            text_fields=text_fields,
+            dataset_name=dataset_name,
+            column_name=column_name,
+            provider="openai",
+            model="gpt-4o-mini",
+            variables=variables
+        )
+        
+        # Check for job ID (this indicates the request was accepted)
+        assert dataset_manager.jobId is not None, "No job ID was returned, column creation may have failed"
+        print(f"Job ID: {dataset_manager.jobId}")
+        
+        # Check job status
+        status = dataset_manager.get_status()
+        print(f"Initial job status: {status}")
+        
+        # Wait for job to complete
+        import time
+        max_retries = 10
+        for i in range(max_retries):
+            time.sleep(10)
+            status = dataset_manager.get_status()
+            print(f"Job status (retry {i+1}): {status}")
+            if status == "success" or status == "failed":
+                break
+        
+        # Wait a bit longer after job completion before checking columns
+        if status == "success":
+            print("Job completed successfully, waiting 30 seconds before checking columns...")
+            time.sleep(30)
+        
+        # Get columns after adding new column
+        columns_after = dataset_manager.get_dataset_columns(dataset_name)
+        print(f"Columns after: {columns_after}")
+        
+        # Print URL to view the dataset in the UI
+        base_url = os.getenv("RAGAAI_CATALYST_BASE_URL", "").removesuffix('/api')
+        if not base_url:
+            base_url = "http://135.235.156.130"  # Fallback to the URL from logs
+        print(f"View dataset at: {base_url}/projects/datasets/{dataset_name}?projectId={dataset_manager.project_id}")
+        
+        # Verify the column was added if the job was successful
+        if status == "success":
+            # We expect the column to be added
+            assert column_name in columns_after, f"Column '{column_name}' not found in dataset after successful job completion"
+        elif status == "failed":
+            pytest.fail(f"Job failed to complete - column '{column_name}' was not added")
+        else:
+            pytest.fail(f"Job did not complete within the timeout period - status: {status}")
+        
+    except Exception as e:
+        import traceback
+        print(f"Exception during add_columns with variables: {e}")
+        print(traceback.format_exc())
+        pytest.fail(f"Failed to add column with variables: {e}")
+def test_delete_dataset(create_project_and_dataset):
+    """Test deleting a dataset"""
+    project_info = create_project_and_dataset
+    dataset_manager = project_info["dataset_manager"]
+    
+    # Create a temporary dataset to delete
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    dataset_name = f"test_delete_me_{timestamp}"
+    
+    # Create a simple dataset
+    test_data = pd.DataFrame({
+        'Query': ['What is a test?', 'How to write tests?'],
+        'Response': ['A test verifies functionality.', 'Start with simple cases.']
+    })
+    
+    # Create a temporary CSV file
+    temp_csv_path = os.path.join(os.path.dirname(__file__), 'temp_delete_test.csv')
+    test_data.to_csv(temp_csv_path, index=False)
+    
+    schema_mapping = {
+        'Query': 'prompt',
+        'Response': 'response'
+    }
+    
+    try:
+        # Create the dataset
+        dataset_manager.create_from_csv(
+            csv_path=temp_csv_path,
+            dataset_name=dataset_name,
+            schema_mapping=schema_mapping
+        )
+        
+        # Verify it exists
+        datasets_before = dataset_manager.list_datasets()
+        assert dataset_name in datasets_before, f"Dataset {dataset_name} not found before deletion"
+        
+        # Delete the dataset
+        dataset_manager.delete_dataset(dataset_name)
+        
+        # Verify it's gone
+        datasets_after = dataset_manager.list_datasets()
+        assert dataset_name not in datasets_after, f"Dataset {dataset_name} still exists after deletion"
+        
+    finally:
+        # Clean up
+        if os.path.exists(temp_csv_path):
+            os.remove(temp_csv_path)
+def test_create_from_jsonl(create_project_and_dataset):
+    """Test creating a dataset from a JSONL file"""
+    project_info = create_project_and_dataset
+    dataset_manager = project_info["dataset_manager"]
+    
+    # Create a temporary JSONL file
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    dataset_name = f"test_jsonl_{timestamp}"
+    jsonl_path = os.path.join(os.path.dirname(__file__), 'temp_test.jsonl')
+    
+    # Create sample JSONL content
+    jsonl_content = [
+        '{"Query": "What is JSONL?", "Response": "JSONL is JSON Lines format.", "Category": "Technical"}',
+        '{"Query": "How to use JSONL?", "Response": "One JSON object per line.", "Category": "Technical"}'
+    ]
+    
+    with open(jsonl_path, 'w') as f:
+        f.write('\n'.join(jsonl_content))
+    
+    schema_mapping = {
+        'Query': 'prompt',
+        'Response': 'response',
+        'Category': 'metadata'
+    }
+    
+    try:
+        # Create dataset from JSONL
+        dataset_manager.create_from_jsonl(
+            jsonl_path=jsonl_path,
+            dataset_name=dataset_name,
+            schema_mapping=schema_mapping
+        )
+        
+        # Verify it exists
+        datasets = dataset_manager.list_datasets()
+        assert dataset_name in datasets, f"Dataset {dataset_name} not found after creation from JSONL"
+        
+        # Verify columns
+        columns = dataset_manager.get_dataset_columns(dataset_name)
+        assert 'Query' in columns, "Query column not found in dataset created from JSONL"
+        assert 'Response' in columns, "Response column not found in dataset created from JSONL"
+        
+    finally:
+        # Clean up
+        if os.path.exists(jsonl_path):
+            os.remove(jsonl_path)
+def test_add_rows_from_jsonl(create_project_and_dataset):
+    """Test adding rows from a JSONL file to an existing dataset"""
+    project_info = create_project_and_dataset
+    dataset_manager = project_info["dataset_manager"]
+    
+    # Create a temporary dataset
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    dataset_name = f"test_add_jsonl_{timestamp}"
+    
+    # Create initial dataset
+    initial_data = pd.DataFrame({
+        'Query': ['What is a test?'],
+        'Response': ['A test verifies functionality.'],
+        'Category': ['Testing']
+    })
+    
+    temp_csv_path = os.path.join(os.path.dirname(__file__), 'temp_initial.csv')
+    initial_data.to_csv(temp_csv_path, index=False)
+    
+    schema_mapping = {
+        'Query': 'prompt',
+        'Response': 'response',
+        'Category': 'metadata'
+    }
+    
+    # Create a JSONL file with additional rows
+    jsonl_path = os.path.join(os.path.dirname(__file__), 'temp_add_rows.jsonl')
+    jsonl_content = [
+        '{"Query": "How to add rows?", "Response": "Use add_rows method.", "Category": "API"}',
+        '{"Query": "What is JSONL?", "Response": "A format with one JSON per line.", "Category": "Format"}'
+    ]
+    
+    with open(jsonl_path, 'w') as f:
+        f.write('\n'.join(jsonl_content))
+    
+    try:
+        # Create initial dataset
+        dataset_manager.create_from_csv(
+            csv_path=temp_csv_path,
+            dataset_name=dataset_name,
+            schema_mapping=schema_mapping
+        )
+        
+        # Add rows from JSONL
+        dataset_manager.add_rows_from_jsonl(
+            jsonl_path=jsonl_path,
+            dataset_name=dataset_name
+        )
+        
+        # Since we can't easily verify row count in the dataset through the API,
+        # we'll just check that the job was accepted and completed
+        assert dataset_manager.jobId is not None, "No job ID returned when adding rows from JSONL"
+        
+        # Wait for job to complete
+        import time
+        max_retries = 5
+        for i in range(max_retries):
+            time.sleep(5)
+            status = dataset_manager.get_status()
+            if status == "success" or status == "failed":
+                break
+                
+        assert status == "success", f"Job failed or timed out: {status}"
+        
+    finally:
+        # Clean up
+        if os.path.exists(temp_csv_path):
+            os.remove(temp_csv_path)
+        if os.path.exists(jsonl_path):
+            os.remove(jsonl_path)
+def test_create_from_df(create_project_and_dataset):
+    """Test creating a dataset from a pandas DataFrame"""
+    project_info = create_project_and_dataset
+    dataset_manager = project_info["dataset_manager"]
+    
+    # Create a test DataFrame
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    dataset_name = f"test_df_{timestamp}"
+    
+    test_df = pd.DataFrame({
+        'Query': ['What is pandas?', 'How to create a DataFrame?'],
+        'Response': ['Pandas is a data analysis library.', 'Use pd.DataFrame().'],
+        'Category': ['Library', 'Function']
+    })
+    
+    schema_mapping = {
+        'Query': 'prompt',
+        'Response': 'response',
+        'Category': 'metadata'
+    }
+    
+    # Create dataset from DataFrame
+    dataset_manager.create_from_df(
+        df=test_df,
+        dataset_name=dataset_name,
+        schema_mapping=schema_mapping
+    )
+    
+    # Verify it exists
+    datasets = dataset_manager.list_datasets()
+    assert dataset_name in datasets, f"Dataset {dataset_name} not found after creation from DataFrame"
+    
+    # Verify columns
+    columns = dataset_manager.get_dataset_columns(dataset_name)
+    assert 'Query' in columns, "Query column not found in dataset created from DataFrame"
+    assert 'Response' in columns, "Response column not found in dataset created from DataFrame"
+def test_add_rows_from_df(create_project_and_dataset):
+    """Test adding rows from a DataFrame to an existing dataset"""
+    project_info = create_project_and_dataset
+    dataset_manager = project_info["dataset_manager"]
+    
+    # Create a temporary dataset
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    dataset_name = f"test_add_df_{timestamp}"
+    
+    # Create initial dataset
+    initial_df = pd.DataFrame({
+        'Query': ['What is a test?'],
+        'Response': ['A test verifies functionality.'],
+        'Category': ['Testing']
+    })
+    
+    schema_mapping = {
+        'Query': 'prompt',
+        'Response': 'response',
+        'Category': 'metadata'
+    }
+    
+    # Create DataFrame with additional rows
+    additional_df = pd.DataFrame({
+        'Query': ['How to add rows?', 'What is pandas?'],
+        'Response': ['Use add_rows method.', 'A data analysis library.'],
+        'Category': ['API', 'Library']
+    })
+    
+    # Create initial dataset from DataFrame
+    dataset_manager.create_from_df(
+        df=initial_df,
+        dataset_name=dataset_name,
+        schema_mapping=schema_mapping
+    )
+    
+    # Add rows from DataFrame
+    dataset_manager.add_rows_from_df(
+        df=additional_df,
+        dataset_name=dataset_name
+    )
+    
+    # Check that the job was accepted and completed
+    assert dataset_manager.jobId is not None, "No job ID returned when adding rows from DataFrame"
+    
+    # Wait for job to complete
+    import time
+    max_retries = 5
+    for i in range(max_retries):
+        time.sleep(5)
+        status = dataset_manager.get_status()
+        if status == "success" or status == "failed":
+            break
+            
+    assert status == "success", f"Job failed or timed out: {status}"

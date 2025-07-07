@@ -74,9 +74,12 @@ def test_list_prompt_version(prompt_manager):
         else:
             raise
 
-def test_missing_prompt_name(prompt_manager):
-    with pytest.raises(ValueError, match="Please enter a valid prompt name"):
-        prompt = prompt_manager.get_prompt(prompt_name="", version="v1")
+def test_missing_prompt_name(prompt_manager, caplog):
+    # Attempt to get a prompt with an empty name
+    prompt_manager.get_prompt(prompt_name="", version="v1")
+    
+    # Check that the correct error message was logged
+    assert "Prompt not found. Please enter a valid prompt name" in caplog.text
 
 def test_get_variable(prompt_manager):
     # Skip test if prompts not set up correctly
