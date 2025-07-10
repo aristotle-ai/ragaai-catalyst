@@ -8,6 +8,7 @@ from urllib3.exceptions import PoolError, MaxRetryError, NewConnectionError
 from requests.exceptions import ConnectionError, Timeout, RequestException
 from http.client import RemoteDisconnected
 from ragaai_catalyst.session_manager import session_manager
+from ragaai_catalyst.utils import json_to_protobuf
 
 logger = logging.getLogger(__name__)
 
@@ -170,8 +171,9 @@ class UploadAgenticTraces:
             headers["x-ms-blob-type"] = "BlockBlob"
         logger.info("Uploading agentic traces to presigned URL...")
         try:
-            with open(filename) as f:
-                payload = f.read().replace("\n", "").replace("\r", "").encode()
+            with open('rag_agent_traces.json', 'r') as f:
+                json_data = json.load(f)
+                payload = json_to_protobuf(json_data).SerializeToString()
         except Exception as e:
             logger.error(f"Error while reading file: {e}")
             return False
