@@ -29,6 +29,11 @@ class DefaultModelNameExtractor(ModelNameExtractor):
                 logger.warning("Missing or invalid 'attributes' in span, got type: %s", type(attributes).__name__)
                 return ""
 
+            model_name = attributes.get("llm.model_name")
+            if model_name:
+                logger.info(f"Found model name in 'llm.model_name': {model_name}")
+                return model_name
+
             raw_metadata = attributes.get("metadata")
             if not isinstance(raw_metadata, str) or not raw_metadata.strip():
                 logger.info("'metadata' is missing or not a non-empty string.")

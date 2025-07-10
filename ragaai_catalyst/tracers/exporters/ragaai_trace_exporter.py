@@ -214,9 +214,17 @@ class RAGATraceExporter(SpanExporter):
                 )
 
                 if isinstance(metadata, dict):
-                    for key, value in metadata.items():
-                        if key not in {"log_source", "recorded_on"}:
-                            ragaai_trace.setdefault("metadata", {})[key] = value
+                    if "metadata" not in ragaai_trace or not isinstance(ragaai_trace["metadata"], dict):
+                        ragaai_trace["metadata"] = {}
+
+                    if "custom_fields" not in ragaai_trace["metadata"] or not isinstance(ragaai_trace["metadata"]["custom_fields"], dict):
+                        ragaai_trace["metadata"]['custom_fields'] = {}
+
+                    # Remove unwanted keys
+                    for key in ("log_source", "recorded_on"):
+                        metadata.pop(key, None)
+
+                    ragaai_trace["metadata"]["custom_fields"]["user_metadata"] = json.dumps(metadata)
 
                 logger.debug("Completed adding user passed metadata")
             except Exception as e:

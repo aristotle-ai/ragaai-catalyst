@@ -1,3 +1,4 @@
+import json
 import logging
 import uuid
 from datetime import datetime
@@ -207,7 +208,7 @@ def convert_json_format(
                         ]
 
                         # Add cost to span attributes for debugging
-                        span["attributes"]["llm.cost"] = span_cost
+                        span["attributes"]["llm.cost"] = json.dumps(span_cost)
                     except Exception as e:
                         logger.warning(f"Failed to calculate span cost: {e}")
 
