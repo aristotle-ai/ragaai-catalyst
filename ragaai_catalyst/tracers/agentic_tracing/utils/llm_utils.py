@@ -378,6 +378,7 @@ def calculate_llm_cost(token_usage, model_name, model_costs, model_custom_cost=N
     model_cost = model_cost = model_costs.get(
         model_name, {"input_cost_per_token": 0.0, "output_cost_per_token": 0.0}
     )
+    logger.info(f"model cost is: {model_cost}")
     if (
         model_cost["input_cost_per_token"] == 0.0
         and model_cost["output_cost_per_token"] == 0.0
