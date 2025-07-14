@@ -1,7 +1,7 @@
 import pytest
 import os
 import dotenv
-dotenv.load_dotenv()
+dotenv.load_dotenv('.env',encoding='utf-8')
 import pandas as pd
 from datetime import datetime
 from typing import Dict, List
