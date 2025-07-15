@@ -331,7 +331,7 @@ class RAGATraceExporter(SpanExporter):
                 trace_file_path = os.path.join(self.tmp_dir, f"{trace_id}.json")
                 with open(trace_file_path, "w") as file:
                     json.dump(ragaai_trace, file, cls=TracerJSONEncoder, indent=2)
-                with open(os.path.join(os.getcwd(), f"{trace_id}.json"), 'w') as f:
+                with open(os.path.join(os.getcwd(), 'rag_agent_traces.json'), 'w') as f:
                     json.dump(ragaai_trace, f, cls=TracerJSONEncoder, indent=2)
             except Exception as e:
                 print(f"Error in saving trace json: {trace_id}: {e}")
