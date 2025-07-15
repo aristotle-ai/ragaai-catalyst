@@ -256,78 +256,63 @@ class RagaAICatalyst:
             headers = {"Content-Type": "application/json"}
             json_data = {"accessKey": access_key, "secretKey": secret_key}
 
-            try:
-                start_time = time.time()
-                endpoint = f"{RagaAICatalyst.BASE_URL}/token"
-                response = session_manager.make_request_with_retry(
-                    'POST',
-                    endpoint,
-                    headers=headers,
-                    json=json_data,
-                    timeout=RagaAICatalyst.TIMEOUT,
-                )
-                elapsed_ms = (time.time() - start_time) * 1000
-                logger.debug(
-                    f"API Call: [POST] {endpoint} | Status: {response.status_code} | Time: {elapsed_ms:.2f}ms"
-                )
+            start_time = time.time()
+            endpoint = f"{RagaAICatalyst.BASE_URL}/token"
+            response = session_manager.make_request_with_retry(
+                'POST',
+                endpoint,
+                headers=headers,
+                json=json_data,
+                timeout=RagaAICatalyst.TIMEOUT,
+            )
+            elapsed_ms = (time.time() - start_time) * 1000
+            logger.debug(
+                f"API Call: [POST] {endpoint} | Status: {response.status_code} | Time: {elapsed_ms:.2f}ms"
+            )
 
-                # Handle specific status codes before raising an error
-                if response.status_code == 400:
-                    token_response = response.json()
-                    if token_response.get("message") == "Please enter valid credentials":
-                        logger.error(
-                            "Authentication failed. Invalid credentials provided. Please check your Access key and Secret key. \nTo view or create new keys, navigate to Settings -> Authenticate in the RagaAI Catalyst dashboard."
-                        )
-                        return None
-
-                # Parse JSON response once
-                try:
-                    token_response = response.json()
-                except ValueError as e:
-                    logger.error(f"Invalid JSON response from token endpoint: {e}")
-                    return None
-
-                # Validate response structure
-                if not isinstance(token_response, dict):
-                    logger.error("Invalid response format - expected JSON object")
-                    return None
-
-                if not token_response.get("success", False):
+            # Handle specific status codes before raising an error
+            if response.status_code == 400:
+                token_response = response.json()
+                if token_response.get("message") == "Please enter valid credentials":
                     logger.error(
-                        "Token retrieval was not successful: %s",
-                        token_response.get("message", "Unknown error"),
+                        "Authentication failed. Invalid credentials provided. Please check your Access key and Secret key. \nTo view or create new keys, navigate to Settings -> Authenticate in the RagaAI Catalyst dashboard."
                     )
                     return None
 
-                # Extract and validate token
-                token = token_response.get("data", {}).get("token")
-                if not token:
-                    logger.error("Token not found in response data")
-                    return None
+            # Parse JSON response once
+            token_response = response.json()
 
-                # Set environment and schedule refresh
-                os.environ["RAGAAI_CATALYST_TOKEN"] = token
-                RagaAICatalyst._token_expiry = (
-                    time.time() + RagaAICatalyst.TOKEN_EXPIRY_TIME
+            # Validate response structure
+            if not isinstance(token_response, dict):
+                logger.error("Invalid response format - expected JSON object")
+                return None
+
+            if not token_response.get("success", False):
+                logger.error(
+                    "Token retrieval was not successful: %s",
+                    token_response.get("message", "Unknown error"),
                 )
-                logger.debug(
-                    f"Token refreshed successfully. Next refresh in {RagaAICatalyst.TOKEN_EXPIRY_TIME / 3600:.1f} hours"
-                )
-
-                # Schedule token refresh 20 seconds before expiration
-                RagaAICatalyst._schedule_token_refresh()
-
-                return token
-
-            except (PoolError, MaxRetryError, NewConnectionError, RemoteDisconnected, ConnectionError, Timeout) as e:
-                session_manager.handle_request_exceptions(e, "token retrieval")
                 return None
-            except RequestException as e:
-                session_manager.handle_request_exceptions(e, "token retrieval")
+
+            # Extract and validate token
+            token = token_response.get("data", {}).get("token")
+            if not token:
+                logger.error("Token not found in response data")
                 return None
-            except Exception as e:
-                logger.error(f"Unexpected error occurred during token retrieval: {e}")
-                return None
+
+            # Set environment and schedule refresh
+            os.environ["RAGAAI_CATALYST_TOKEN"] = token
+            RagaAICatalyst._token_expiry = (
+                time.time() + RagaAICatalyst.TOKEN_EXPIRY_TIME
+            )
+            logger.debug(
+                f"Token refreshed successfully. Next refresh in {RagaAICatalyst.TOKEN_EXPIRY_TIME / 3600:.1f} hours"
+            )
+
+            # Schedule token refresh 20 seconds before expiration
+            RagaAICatalyst._schedule_token_refresh()
+
+            return token
 
     def ensure_valid_token(self) -> Union[str, None]:
         """
