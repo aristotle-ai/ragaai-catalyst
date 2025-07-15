@@ -500,8 +500,6 @@ class Tracer(AgenticTracing):
         # Update the tracer's own dataset_name (fallback)
         self.dataset_name = dataset_name
         
-        # Note: We no longer update the global dataset_processor to avoid race conditions
-        # The processor will now read from context variables in on_start()
         logger.debug(f"Dataset name set via context variables for request-level isolation")
 
     def _improve_metadata(self, metadata, tracer_type):
