@@ -7,7 +7,6 @@ from urllib3.util.retry import Retry
 from urllib3.exceptions import PoolError, MaxRetryError, NewConnectionError
 from requests.exceptions import ConnectionError, Timeout
 from http.client import RemoteDisconnected
-from ragaai_catalyst import RagaAICatalyst
 import requests
 
 logger = logging.getLogger(__name__)
@@ -63,10 +62,10 @@ class SessionManager:
 
         logger.info("HTTP session initialized successfully with adapters mounted for http:// and https://")
 
-        # Warm up connection pool using RagaAICatalyst.BASE_URL
+        # Warm up connection pool using base URL from environment variable
         if os.getenv("RAGAAI_CATALYST_BASE_URL") is not None:
             base_url = os.getenv("RAGAAI_CATALYST_BASE_URL")
-            logger.info(f"Warming up connection pool using RagaAICatalyst.BASE_URL: {base_url}")
+            logger.info(f"Warming up connection pool using base URL: {base_url}")
             self.warm_up_connections(base_url)
         else:
             logger.warning(f"RAGAAI_CATALYST_BASE_URL not available, skipping connection warmup")
