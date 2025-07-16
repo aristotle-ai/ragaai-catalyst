@@ -322,12 +322,28 @@ class Tracer(AgenticTracing):
                 from  openinference.instrumentation.mcp import MCPInstrumentor
                 instrumentors += [(MCPInstrumentor, [])]
 
+                # Add OpenAI Agents instrumentor for MCP compatibility
                 try:
                     from openinference.instrumentation.openai_agents import OpenAIAgentsInstrumentor
-                    instrumentors.append((OpenAIAgentsInstrumentor, []))
+                    instrumentors += [(OpenAIAgentsInstrumentor, [])]
+                    logger.info("Instrumenting OpenAI Agents for MCP...")
                 except (ImportError, ModuleNotFoundError):
                     logger.debug("OpenAI Agents not available in environment")
-
+               
+                # LangGraph uses LangChain components internally
+                try:
+                    from openinference.instrumentation.langchain import LangChainInstrumentor
+                    instrumentors += [(LangChainInstrumentor, [])]
+                    logger.info("Instrumenting LangChain for LangGraph MCP tools...")
+                except (ImportError, ModuleNotFoundError):
+                    logger.debug("LangChain not available in environment")
+                
+                try:
+                    from  openinference.instrumentation.google_adk import GoogleADKInstrumentor
+                    instrumentors += [(GoogleADKInstrumentor, [])]
+                except (ImportError, ModuleNotFoundError):
+                    logger.debug("GoogleADK not available in environment")
+                
             else:
                 # Unknown agentic tracer type
                 logger.warning(f"Unknown agentic tracer type: {tracer_type}")
