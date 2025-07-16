@@ -6,6 +6,10 @@ import time
 from typing import Dict, Optional, Union
 
 import requests
+from urllib3.exceptions import PoolError, MaxRetryError, NewConnectionError
+from requests.exceptions import ConnectionError, Timeout, RequestException, HTTPError
+from http.client import RemoteDisconnected
+from ragaai_catalyst.session_manager import session_manager
 
 logger = logging.getLogger("RagaAICatalyst")
 logging_level = (
@@ -75,7 +79,7 @@ class RagaAICatalyst:
                 # set the os.environ["RAGAAI_CATALYST_BASE_URL"] before getting the token as it is used in the get_token method
                 os.environ["RAGAAI_CATALYST_BASE_URL"] = RagaAICatalyst.BASE_URL
                 RagaAICatalyst.get_token(force_refresh=True)
-            except requests.exceptions.RequestException:
+            except RequestException:
                 logger.error("The provided base_url is not accessible. Please re-check the base_url.")
         else:
             # Get the token from the server
@@ -131,22 +135,32 @@ class RagaAICatalyst:
             for service, key in self.api_keys.items()
         ]
         json_data = {"secrets": secrets}
-        start_time = time.time()
-        endpoint = f"{RagaAICatalyst.BASE_URL}/v1/llm/secrets/upload"
-        response = requests.post(
-            endpoint,
-            headers=headers,
-            json=json_data,
-            timeout=RagaAICatalyst.TIMEOUT,
-        )
-        elapsed_ms = (time.time() - start_time) * 1000
-        logger.debug(
-            f"API Call: [POST] {endpoint} | Status: {response.status_code} | Time: {elapsed_ms:.2f}ms"
-        )
-        if response.status_code == 200:
-            print("API keys uploaded successfully")
-        else:
-            logger.error("Failed to upload API keys")
+
+        try:
+            start_time = time.time()
+            endpoint = f"{RagaAICatalyst.BASE_URL}/v1/llm/secrets/upload"
+            response = session_manager.make_request_with_retry(
+                'POST',
+                endpoint,
+                headers=headers,
+                json=json_data,
+                timeout=RagaAICatalyst.TIMEOUT,
+            )
+            elapsed_ms = (time.time() - start_time) * 1000
+            logger.debug(
+                f"API Call: [POST] {endpoint} | Status: {response.status_code} | Time: {elapsed_ms:.2f}ms"
+            )
+            if response.status_code == 200:
+                print("API keys uploaded successfully")
+            else:
+                logger.error(f"Failed to upload API keys. Status: {response.status_code}")
+
+        except (PoolError, MaxRetryError, NewConnectionError, RemoteDisconnected, ConnectionError, Timeout) as e:
+            session_manager.handle_request_exceptions(e, "uploading API keys")
+        except RequestException as e:
+            session_manager.handle_request_exceptions(e, "uploading API keys")
+        except Exception as e:
+            logger.error(f"Unexpected error occurred while uploading API keys: {e}")
 
     def add_api_key(self, service: str, key: str):
         """Add or update an API key for a specific service."""
@@ -244,7 +258,8 @@ class RagaAICatalyst:
 
             start_time = time.time()
             endpoint = f"{RagaAICatalyst.BASE_URL}/token"
-            response = requests.post(
+            response = session_manager.make_request_with_retry(
+                'POST',
                 endpoint,
                 headers=headers,
                 json=json_data,
@@ -262,9 +277,15 @@ class RagaAICatalyst:
                     logger.error(
                         "Authentication failed. Invalid credentials provided. Please check your Access key and Secret key. \nTo view or create new keys, navigate to Settings -> Authenticate in the RagaAI Catalyst dashboard."
                     )
+                    return None
 
-            response.raise_for_status()
+            # Parse JSON response once
             token_response = response.json()
+
+            # Validate response structure
+            if not isinstance(token_response, dict):
+                logger.error("Invalid response format - expected JSON object")
+                return None
 
             if not token_response.get("success", False):
                 logger.error(
@@ -273,23 +294,25 @@ class RagaAICatalyst:
                 )
                 return None
 
+            # Extract and validate token
             token = token_response.get("data", {}).get("token")
-            if token:
-                os.environ["RAGAAI_CATALYST_TOKEN"] = token
-                RagaAICatalyst._token_expiry = (
-                    time.time() + RagaAICatalyst.TOKEN_EXPIRY_TIME
-                )
-                logger.debug(
-                    f"Token refreshed successfully. Next refresh in {RagaAICatalyst.TOKEN_EXPIRY_TIME / 3600:.1f} hours"
-                )
-
-                # Schedule token refresh 20 seconds before expiration
-                RagaAICatalyst._schedule_token_refresh()
-
-                return token
-            else:
-                logger.error("Token(s) not set")
+            if not token:
+                logger.error("Token not found in response data")
                 return None
+
+            # Set environment and schedule refresh
+            os.environ["RAGAAI_CATALYST_TOKEN"] = token
+            RagaAICatalyst._token_expiry = (
+                time.time() + RagaAICatalyst.TOKEN_EXPIRY_TIME
+            )
+            logger.debug(
+                f"Token refreshed successfully. Next refresh in {RagaAICatalyst.TOKEN_EXPIRY_TIME / 3600:.1f} hours"
+            )
+
+            # Schedule token refresh 20 seconds before expiration
+            RagaAICatalyst._schedule_token_refresh()
+
+            return token
 
     def ensure_valid_token(self) -> Union[str, None]:
         """
@@ -347,16 +370,53 @@ class RagaAICatalyst:
             headers = self.get_auth_header()
             start_time = time.time()
             endpoint = f"{RagaAICatalyst.BASE_URL}/v2/llm/usecase"
-            response = requests.get(endpoint, headers=headers, timeout=self.TIMEOUT)
+            response = session_manager.make_request_with_retry(
+                'GET',
+                endpoint,
+                headers=headers,
+                timeout=self.TIMEOUT
+            )
             elapsed_ms = (time.time() - start_time) * 1000
             logger.debug(
                 f"API Call: [GET] {endpoint} | Status: {response.status_code} | Time: {elapsed_ms:.2f}ms"
             )
-            response.raise_for_status()  # Use raise_for_status to handle HTTP errors
-            usecase = response.json()["data"]["usecase"]
+
+            # Check for successful status codes
+            if response.status_code not in [200, 201]:
+                logger.error(f"Failed to retrieve use cases - Status: {response.status_code}")
+                return []
+
+            # Parse JSON response once
+            try:
+                response_data = response.json()
+            except ValueError as e:
+                logger.error(f"Invalid JSON response from use cases endpoint: {e}")
+                return []
+
+            # Validate response structure and extract use cases
+            if not isinstance(response_data, dict):
+                logger.error("Invalid response format - expected JSON object")
+                return []
+
+            if not response_data.get("success", False):
+                logger.error(f"Use cases retrieval was not successful: {response_data.get('message', 'Unknown error')}")
+                return []
+
+            usecase = response_data.get("data", {}).get("usecase", [])
+            if not isinstance(usecase, list):
+                logger.error("Invalid use cases format - expected list")
+                return []
+
             return usecase
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to retrieve project use cases: {e}")
+
+        except (PoolError, MaxRetryError, NewConnectionError, RemoteDisconnected, ConnectionError, Timeout) as e:
+            session_manager.handle_request_exceptions(e, "retrieving project use cases")
+            return []
+        except RequestException as e:
+            session_manager.handle_request_exceptions(e, "retrieving project use cases")
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error occurred while retrieving project use cases: {e}")
             return []
 
     def create_project(self, project_name, usecase="Q/A", type="llm"):
@@ -390,7 +450,8 @@ class RagaAICatalyst:
         try:
             start_time = time.time()
             endpoint = f"{RagaAICatalyst.BASE_URL}/v2/llm/project"
-            response = requests.post(
+            response = session_manager.make_request_with_retry(
+                'POST',
                 endpoint,
                 headers=headers,
                 json=json_data,
@@ -400,46 +461,97 @@ class RagaAICatalyst:
             logger.debug(
                 f"API Call: [POST] {endpoint} | Status: {response.status_code} | Time: {elapsed_ms:.2f}ms"
             )
-            response.raise_for_status()
-            print(
-                f"Project Created Successfully with name {response.json()['data']['name']} & usecase {usecase}"
-            )
-            return f"Project Created Successfully with name {response.json()['data']['name']} & usecase {usecase}"
 
-        except requests.exceptions.HTTPError as http_err:
-            if response.status_code == 401:
-                logger.warning("Received 401 error. Attempting to refresh token.")
-                RagaAICatalyst.get_token(force_refresh=True)
-                headers["Authorization"] = (
-                    f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}"
-                )
+            # Handle successful status codes first
+            if response.status_code in [200, 201]:
+                # Parse JSON response once
                 try:
-                    response = requests.post(
-                        f"{RagaAICatalyst.BASE_URL}/v2/llm/project",
-                        headers=headers,
-                        json=json_data,
-                        timeout=self.TIMEOUT,
-                    )
-                    response.raise_for_status()
-                    print(
-                        "Project Created Successfully with name %s after token refresh",
-                        response.json()["data"]["name"],
-                    )
-                    return f"Project Created Successfully with name {response.json()['data']['name']}"
-                except requests.exceptions.HTTPError as refresh_http_err:
-                    logger.error(
-                        "Failed to create project after token refresh: %s",
-                        str(refresh_http_err),
-                    )
-                    return f"Failed to create project: {response.json().get('message', 'Authentication error after token refresh')}"
+                    response_data = response.json()
+                except ValueError as e:
+                    logger.error(f"Invalid JSON response from create project endpoint: {e}")
+                    return "Failed to create project: Invalid response format"
+
+                # Validate response structure
+                if not isinstance(response_data, dict):
+                    logger.error("Invalid response format - expected JSON object")
+                    return "Failed to create project: Invalid response format"
+
+                if not response_data.get("success", False):
+                    logger.error(f"Project creation was not successful: {response_data.get('message', 'Unknown error')}")
+                    return f"Failed to create project: {response_data.get('message', 'Unknown error')}"
+
+                project_name_response = response_data.get("data", {}).get("name")
+                if not project_name_response:
+                    logger.error("Project name not found in response")
+                    return "Failed to create project: Project name not returned"
+
+                success_message = f"Project Created Successfully with name {project_name_response} & usecase {usecase}"
+                print(success_message)
+                return success_message
+
+            # Handle 401 status code (authentication error)
+            elif response.status_code == 401:
+                logger.warning("Received 401 error while creating project. Attempting to refresh token.")
+                token = RagaAICatalyst.get_token(force_refresh=True)
+                headers["Authorization"] = f"Bearer {token}"
+
+                start_time = time.time()
+                response = session_manager.make_request_with_retry(
+                    'POST',
+                    endpoint,
+                    headers=headers,
+                    json=json_data,
+                    timeout=self.TIMEOUT,
+                )
+                elapsed_ms = (time.time() - start_time) * 1000
+                logger.debug(
+                    f"API Call: [POST] {endpoint} (retry) | Status: {response.status_code} | Time: {elapsed_ms:.2f}ms"
+                )
+
+                if response.status_code in [200, 201]:
+                    # Parse JSON response once
+                    try:
+                        response_data = response.json()
+                    except ValueError as e:
+                        logger.error(f"Invalid JSON response from create project endpoint after token refresh: {e}")
+                        return "Failed to create project: Invalid response format"
+
+                    # Validate response structure
+                    if not isinstance(response_data, dict):
+                        logger.error("Invalid response format after token refresh - expected JSON object")
+                        return "Failed to create project after token refresh: Invalid response format"
+
+                    if not response_data.get("success", False):
+                        logger.error(f"Project creation was not successful after token refresh: {response_data.get('message', 'Unknown error')}")
+                        return f"Failed to create project after token refresh: {response_data.get('message', 'Unknown error')}"
+
+                    project_name_response = response_data.get("data", {}).get("name")
+                    if not project_name_response:
+                        logger.error("Project name not found in response after token refresh")
+                        return "Failed to create project after token refresh: Project name not returned"
+
+                    success_message = f"Project Created Successfully with name {project_name_response} & usecase {usecase}"
+                    print(success_message)
+                    return success_message
+                else:
+                    logger.error(f"Error while creating project after token refresh: Status {response.status_code}")
+                    return f"Failed to create project after token refresh: Status {response.status_code}"
+
+            # Handle all other status codes explicitly
             else:
-                logger.error("Failed to create project: %s", str(http_err))
-                return f"Failed to create project: {response.json().get('message', 'Unknown error')}"
-        except requests.exceptions.Timeout as timeout_err:
-            logger.error(
-                "Request timed out while creating project: %s", str(timeout_err)
-            )
-            return "Failed to create project: Request timed out"
+                logger.error(f"Failed to create project - Status: {response.status_code}")
+                try:
+                    error_message = response.json().get('message', 'Unknown error')
+                except (ValueError, AttributeError):
+                    error_message = f'HTTP {response.status_code} error'
+                return f"Failed to create project: {error_message}"
+
+        except (PoolError, MaxRetryError, NewConnectionError, RemoteDisconnected, ConnectionError, Timeout) as e:
+            session_manager.handle_request_exceptions(e, "creating project")
+            return "Failed to create project: Connection error"
+        except RequestException as e:
+            session_manager.handle_request_exceptions(e, "creating project")
+            return "Failed to create project: Request error"
         except Exception as general_err1:
             logger.error(
                 "Unexpected error while creating project: %s", str(general_err1)
@@ -465,7 +577,8 @@ class RagaAICatalyst:
         try:
             start_time = time.time()
             endpoint = f"{RagaAICatalyst.BASE_URL}/v2/llm/projects?size={num_projects}"
-            response = requests.get(
+            response = session_manager.make_request_with_retry(
+                'GET',
                 endpoint,
                 headers=headers,
                 timeout=self.TIMEOUT,
@@ -474,55 +587,103 @@ class RagaAICatalyst:
             logger.debug(
                 f"API Call: [GET] {endpoint} | Status: {response.status_code} | Time: {elapsed_ms:.2f}ms"
             )
-            response.raise_for_status()
             logger.debug("Projects list retrieved successfully")
 
-            project_list = [
-                project["name"] for project in response.json()["data"]["content"]
-            ]
-
-            return project_list
-        except requests.exceptions.HTTPError as http_err:
-            if response.status_code == 401:
-                logger.warning("Received 401 error. Attempting to refresh token.")
-                RagaAICatalyst.get_token(force_refresh=True)
-                headers["Authorization"] = (
-                    f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}"
-                )
+            # Handle successful status codes first
+            if response.status_code in [200, 201]:
+                # Parse JSON response once
                 try:
-                    response = requests.get(
-                        f"{RagaAICatalyst.BASE_URL}/v2/llm/projects",
-                        headers=headers,
-                        timeout=self.TIMEOUT,
-                    )
-                    elapsed_ms = (time.time() - start_time) * 1000
-                    logger.debug(
-                        f"API Call:[GET] {endpoint} | Status: {response.status_code} | Time: {elapsed_ms:.2f}ms"
-                    )
-                    response.raise_for_status()
-                    logger.debug("Projects list retrieved successfully")
+                    response_data = response.json()
+                except ValueError as e:
+                    logger.error(f"Invalid JSON response from list projects endpoint: {e}")
+                    return "Failed to list projects: Invalid response format"
+
+                # Validate response structure
+                if not isinstance(response_data, dict):
+                    logger.error("Invalid response format - expected JSON object")
+                    return "Failed to list projects: Invalid response format"
+
+                if not response_data.get("success", False):
+                    logger.error(f"Projects listing was not successful: {response_data.get('message', 'Unknown error')}")
+                    return f"Failed to list projects: {response_data.get('message', 'Unknown error')}"
+
+                content = response_data.get("data", {}).get("content", [])
+                if not isinstance(content, list):
+                    logger.error("Invalid projects format - expected list")
+                    return "Failed to list projects: Invalid data format"
+
+                project_list = [
+                    project.get("name") for project in content
+                    if isinstance(project, dict) and project.get("name")
+                ]
+
+                return project_list
+
+            # Handle 401 status code (authentication error)
+            elif response.status_code == 401:
+                logger.warning("Received 401 error while listing projects. Attempting to refresh token.")
+                token = RagaAICatalyst.get_token(force_refresh=True)
+                headers["Authorization"] = f"Bearer {token}"
+
+                start_time = time.time()
+                response = session_manager.make_request_with_retry(
+                    'GET',
+                    f"{RagaAICatalyst.BASE_URL}/v2/llm/projects?size={num_projects}",
+                    headers=headers,
+                    timeout=self.TIMEOUT,
+                )
+                elapsed_ms = (time.time() - start_time) * 1000
+                logger.debug(
+                    f"API Call: [GET] {endpoint} (retry) | Status: {response.status_code} | Time: {elapsed_ms:.2f}ms"
+                )
+
+                if response.status_code in [200, 201]:
+                    # Parse JSON response once
+                    try:
+                        response_data = response.json()
+                    except ValueError as e:
+                        logger.error(f"Invalid JSON response from list projects endpoint after token refresh: {e}")
+                        return "Failed to list projects after token refresh: Invalid response format"
+
+                    # Validate response structure
+                    if not isinstance(response_data, dict):
+                        logger.error("Invalid response format after token refresh - expected JSON object")
+                        return "Failed to list projects after token refresh: Invalid response format"
+
+                    if not response_data.get("success", False):
+                        logger.error(f"Projects listing was not successful after token refresh: {response_data.get('message', 'Unknown error')}")
+                        return f"Failed to list projects after token refresh: {response_data.get('message', 'Unknown error')}"
+
+                    content = response_data.get("data", {}).get("content", [])
+                    if not isinstance(content, list):
+                        logger.error("Invalid projects format after token refresh - expected list")
+                        return "Failed to list projects after token refresh: Invalid data format"
 
                     project_list = [
-                        project["name"]
-                        for project in response.json()["data"]["content"]
+                        project.get("name") for project in content
+                        if isinstance(project, dict) and project.get("name")
                     ]
 
                     return project_list
+                else:
+                    logger.error(f"Error while listing projects after token refresh: Status {response.status_code}")
+                    return f"Failed to list projects after token refresh: Status {response.status_code}"
 
-                except requests.exceptions.HTTPError as refresh_http_err:
-                    logger.error(
-                        "Failed to list projects after token refresh: %s",
-                        str(refresh_http_err),
-                    )
-                    return f"Failed to list projects: {response.json().get('message', 'Authentication error after token refresh')}"
+            # Handle all other status codes explicitly
             else:
-                logger.error("Failed to list projects: %s", str(http_err))
-                return f"Failed to list projects: {response.json().get('message', 'Unknown error')}"
-        except requests.exceptions.Timeout as timeout_err:
-            logger.error(
-                "Request timed out while listing projects: %s", str(timeout_err)
-            )
-            return "Failed to list projects: Request timed out"
+                logger.error(f"Failed to list projects - Status: {response.status_code}")
+                try:
+                    error_message = response.json().get('message', 'Unknown error')
+                except (ValueError, AttributeError):
+                    error_message = f'HTTP {response.status_code} error'
+                return f"Failed to list projects: {error_message}"
+
+        except (PoolError, MaxRetryError, NewConnectionError, RemoteDisconnected, ConnectionError, Timeout) as e:
+            session_manager.handle_request_exceptions(e, "listing projects")
+            return "Failed to list projects: Connection error"
+        except RequestException as e:
+            session_manager.handle_request_exceptions(e, "listing projects")
+            return "Failed to list projects: Request error"
         except Exception as general_err2:
             logger.error(
                 "Unexpected error while listing projects: %s", str(general_err2)
@@ -541,7 +702,8 @@ class RagaAICatalyst:
         try:
             start_time = time.time()
             endpoint = f"{RagaAICatalyst.BASE_URL}/v1/llm/llm-metrics"
-            response = requests.get(
+            response = session_manager.make_request_with_retry(
+                'GET',
                 endpoint,
                 headers=headers,
                 timeout=RagaAICatalyst.TIMEOUT,
@@ -550,54 +712,102 @@ class RagaAICatalyst:
             logger.debug(
                 f"API Call: [GET] {endpoint} | Status: {response.status_code} | Time: {elapsed_ms:.2f}ms"
             )
-            response.raise_for_status()
             logger.debug("Metrics list retrieved successfully")
 
-            metrics = response.json()["data"]["metrics"]
-            # For each dict in metric only return the keys: `name`, `category`
-            sub_metrics = [metric["name"] for metric in metrics]
-            return sub_metrics
-
-        except requests.exceptions.HTTPError as http_err:
-            if response.status_code == 401:
-                logger.warning("Received 401 error. Attempting to refresh token.")
-                RagaAICatalyst.get_token(force_refresh=True)
-                headers["Authorization"] = (
-                    f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}"
-                )
+            # Handle successful status codes first
+            if response.status_code in [200, 201]:
+                # Parse JSON response once
                 try:
-                    response = requests.get(
-                        f"{RagaAICatalyst.BASE_URL}/v1/llm/llm-metrics",
-                        headers=headers,
-                        timeout=RagaAICatalyst.TIMEOUT,
-                    )
-                    response.raise_for_status()
-                    logger.debug(
-                        "Metrics list retrieved successfully after token refresh"
-                    )
-                    metrics = [
-                        project["name"]
-                        for project in response.json()["data"]["metrics"]
-                    ]
-                    # For each dict in metric only return the keys: `name`, `category`
+                    response_data = response.json()
+                except ValueError as e:
+                    logger.error(f"Invalid JSON response from list metrics endpoint: {e}")
+                    return []
+
+                # Validate response structure
+                if not isinstance(response_data, dict):
+                    logger.error("Invalid response format - expected JSON object")
+                    return []
+
+                if not response_data.get("success", False):
+                    logger.error(f"Metrics listing was not successful: {response_data.get('message', 'Unknown error')}")
+                    return []
+
+                metrics = response_data.get("data", {}).get("metrics", [])
+                if not isinstance(metrics, list):
+                    logger.error("Invalid metrics format - expected list")
+                    return []
+
+                sub_metrics = [
+                    metric.get("name") for metric in metrics 
+                    if isinstance(metric, dict) and metric.get("name")
+                ]
+                return sub_metrics
+
+            # Handle 401 status code (authentication error)
+            elif response.status_code == 401:
+                logger.warning("Received 401 error while listing metrics. Attempting to refresh token.")
+                token = RagaAICatalyst.get_token(force_refresh=True)
+                headers["Authorization"] = f"Bearer {token}"
+
+                start_time = time.time()
+                response = session_manager.make_request_with_retry(
+                    'GET',
+                    f"{RagaAICatalyst.BASE_URL}/v1/llm/llm-metrics",
+                    headers=headers,
+                    timeout=RagaAICatalyst.TIMEOUT,
+                )
+                elapsed_ms = (time.time() - start_time) * 1000
+                logger.debug(
+                    f"API Call: [GET] {endpoint} (retry) | Status: {response.status_code} | Time: {elapsed_ms:.2f}ms"
+                )
+
+                if response.status_code in [200, 201]:
+                    # Parse JSON response once
+                    try:
+                        response_data = response.json()
+                    except ValueError as e:
+                        logger.error(f"Invalid JSON response from list metrics endpoint after token refresh: {e}")
+                        return []
+
+                    # Validate response structure
+                    if not isinstance(response_data, dict):
+                        logger.error("Invalid response format after token refresh - expected JSON object")
+                        return []
+
+                    if not response_data.get("success", False):
+                        logger.error(f"Metrics listing was not successful after token refresh: {response_data.get('message', 'Unknown error')}")
+                        return []
+
+                    metrics = response_data.get("data", {}).get("metrics", [])
+                    if not isinstance(metrics, list):
+                        logger.error("Invalid metrics format after token refresh - expected list")
+                        return []
+
                     sub_metrics = [
-                        {
-                            "name": metric["name"],
-                            "category": metric["category"],
-                        }
-                        for metric in metrics
+                        metric.get("name") for metric in metrics
+                        if isinstance(metric, dict) and metric.get("name")
                     ]
                     return sub_metrics
+                else:
+                    logger.error(f"Error while listing metrics after token refresh: Status {response.status_code}")
+                    return []
 
-                except requests.exceptions.HTTPError as refresh_http_err:
-                    logger.error(
-                        "Failed to list metrics after token refresh: %s",
-                        str(refresh_http_err),
-                    )
-                    return f"Failed to list metrics: {response.json().get('message', 'Authentication error after token refresh')}"
+            # Handle all other status codes explicitly
             else:
-                logger.error("Failed to list metrics: %s", str(http_err))
-                return f"Failed to list metrics: {response.json().get('message', 'Unknown error')}"
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to list metrics: {e}")
+                logger.error(f"Failed to list metrics - Status: {response.status_code}")
+                try:
+                    error_message = response.json().get('message', 'Unknown error')
+                except (ValueError, AttributeError):
+                    error_message = f'HTTP {response.status_code} error'
+                logger.error(f"Metrics listing error: {error_message}")
+                return []
+
+        except (PoolError, MaxRetryError, NewConnectionError, RemoteDisconnected, ConnectionError, Timeout) as e:
+            session_manager.handle_request_exceptions(e, "listing metrics")
+            return []
+        except RequestException as e:
+            session_manager.handle_request_exceptions(e, "listing metrics")
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error occurred while listing metrics: {e}")
             return []
