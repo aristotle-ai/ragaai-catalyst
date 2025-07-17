@@ -6,7 +6,8 @@ import dotenv
 import openai
 import time
 dotenv.load_dotenv()
-
+import logging
+logger = logging.getLogger(__name__)
 
 @pytest.fixture
 def base_url():
@@ -75,8 +76,13 @@ def test_list_prompt_version(prompt_manager):
             raise
 
 def test_missing_prompt_name(prompt_manager):
-    with pytest.raises(ValueError, match="Please enter a valid prompt name"):
-        prompt = prompt_manager.get_prompt(prompt_name="", version="v1")
+    # Test that empty prompt name returns None
+    prompt = prompt_manager.get_prompt(prompt_name="", version="v1")
+    assert prompt is None
+    
+    # Test that None prompt name returns None
+    prompt = prompt_manager.get_prompt(prompt_name=None, version="v1")
+    assert prompt is None
 
 def test_get_variable(prompt_manager):
     # Skip test if prompts not set up correctly

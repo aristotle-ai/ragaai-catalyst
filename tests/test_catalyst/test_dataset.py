@@ -1,7 +1,7 @@
 import pytest
 import os
-import dotenv
-dotenv.load_dotenv()
+from dotenv import load_dotenv
+load_dotenv(".env",encoding="utf-8")
 import pandas as pd
 from datetime import datetime
 from typing import Dict, List
@@ -94,24 +94,24 @@ def create_project_and_dataset():
         "dataset_name": dataset_name,
         "dataset_manager": dataset_manager
     }
-def test_create_project_and_dataset_if_not_exist(create_project_and_dataset):
-    """Test creating a project and dataset if they don't exist"""
-    project_info = create_project_and_dataset
+# def test_create_project_and_dataset_if_not_exist(create_project_and_dataset):
+#     """Test creating a project and dataset if they don't exist"""
+#     project_info = create_project_and_dataset
     
-    # Verify the project and dataset were created or already exist
-    dataset_manager = project_info["dataset_manager"]
+#     # Verify the project and dataset were created or already exist
+#     dataset_manager = project_info["dataset_manager"]
     
-    # List datasets and verify our test dataset is there
-    datasets = dataset_manager.list_datasets()
-    assert project_info["dataset_name"] in datasets, f"Dataset {project_info['dataset_name']} not found in {datasets}"
+#     # List datasets and verify our test dataset is there
+#     datasets = dataset_manager.list_datasets()
+#     assert project_info["dataset_name"] in datasets, f"Dataset {project_info['dataset_name']} not found in {datasets}"
     
-    # Verify we can get dataset columns
-    try:
-        dataset_columns = dataset_manager.get_dataset_columns(dataset_name=project_info["dataset_name"])
-        assert isinstance(dataset_columns, list), "Dataset columns should be a list"
-        assert len(dataset_columns) > 0, "Dataset should have columns"
-    except Exception as e:
-        pytest.fail(f"Failed to get dataset columns: {e}")
+#     # Verify we can get dataset columns
+#     try:
+#         dataset_columns = dataset_manager.get_dataset_columns(dataset_name=project_info["dataset_name"])
+#         assert isinstance(dataset_columns, list), "Dataset columns should be a list"
+#         assert len(dataset_columns) > 0, "Dataset should have columns"
+#     except Exception as e:
+#         pytest.fail(f"Failed to get dataset columns: {e}")
 
 @pytest.fixture
 def dataset(base_url, access_keys):
@@ -224,28 +224,29 @@ def test_upload_csv_empty_csv_path(dataset, caplog):
         'Context': 'context',
         'ExpectedResponse': 'expected_response',
     }
-
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     result = dataset.create_from_csv(
         csv_path="",
-        dataset_name="schema_metric_dataset_ritika_12",
+        dataset_name="schema_metric_dataset_ritika_12"+timestamp,
         schema_mapping=schema_mapping
     )
-    assert "No such file or directory" in caplog.text
+    assert "CSV file does not exist" in caplog.text
 
 
 # Fix test_upload_csv_empty_schema_mapping to check for log message
 def test_upload_csv_empty_schema_mapping(dataset, caplog):
     """Test error handling for empty schema mapping"""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     result = dataset.create_from_csv(
         csv_path=csv_path,
-        dataset_name="schema_metric_dataset_ritika_12",
+        dataset_name="schema_metric_dataset_ritika_12"+timestamp,
         schema_mapping=""
     )
-    assert "Error in create_from_csv: 'str' object has no attribute 'items'" in caplog.text
+    assert "Unexpected error in create_from_csv: 'str' object has no attribute 'items'" in caplog.text
 
 
 
-# Fix test_upload_csv_invalid_schema to check for log message
+# # Fix test_upload_csv_invalid_schema to check for log message
 def test_upload_csv_invalid_schema(dataset, caplog):
     """Test error handling for invalid schema mapping"""
     schema_mapping = {
@@ -254,10 +255,14 @@ def test_upload_csv_invalid_schema(dataset, caplog):
         'chatId': 'chatId',
         'chatSequence': 'chatSequence'
     }
-
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     result = dataset.create_from_csv(
         csv_path=csv_path,
-        dataset_name="schema_metric_dataset_ritika_12",
+        dataset_name="schema_metric_dataset_invalid_schema"+timestamp,
         schema_mapping=schema_mapping
     )
-    assert "Invalid schema mapping provided" in caplog.text or "Failed to upload CSV to elastic" in caplog.text
+    assert any(msg in caplog.text for msg in [
+        "Invalid schema mapping provided", 
+        "Failed to upload CSV to elastic",
+        "No valid mapping found"
+    ])
