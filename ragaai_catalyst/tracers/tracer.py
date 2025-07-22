@@ -286,6 +286,9 @@ class Tracer(AgenticTracing):
             
             # Handle specific framework instrumentation
             elif tracer_type == "agentic/llamaindex" or tracer_type == "llamaindex":
+                from  openinference.instrumentation.mcp import MCPInstrumentor
+                instrumentors += [(MCPInstrumentor, [])]
+
                 from openinference.instrumentation.llama_index import LlamaIndexInstrumentor
                 instrumentors += [(LlamaIndexInstrumentor, [])] 
 
