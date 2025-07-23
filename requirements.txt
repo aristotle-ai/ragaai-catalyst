@@ -33,7 +33,7 @@ openinference-instrumentation-crewai
 openinference-instrumentation-haystack
 openinference-instrumentation-openai-agents
 openinference-instrumentation-smolagents
-openinference.instrumentation.mcp
+openinference-instrumentation-mcp
 opentelemetry-sdk
 opentelemetry-exporter-otlp
 opentelemetry-proto>=1.12.0

@@ -58,6 +58,7 @@ dependencies = [
     "openinference-instrumentation-openai-agents",
     "openinference-instrumentation-smolagents",
     "openinference-instrumentation-google-adk",
+    "openinference-instrumentation-mcp",
     "opentelemetry-sdk",
     "opentelemetry-exporter-otlp",
     "opentelemetry-proto>=1.12.0",
