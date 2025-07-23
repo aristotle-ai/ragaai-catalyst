@@ -288,10 +288,15 @@ class Tracer(AgenticTracing):
             
             # Handle specific framework instrumentation
             elif tracer_type == "agentic/llamaindex" or tracer_type == "llamaindex":
+                from  openinference.instrumentation.mcp import MCPInstrumentor
+                instrumentors += [(MCPInstrumentor, [])]
+
                 from openinference.instrumentation.llama_index import LlamaIndexInstrumentor
                 instrumentors += [(LlamaIndexInstrumentor, [])] 
 
             elif tracer_type == "agentic/langchain" or tracer_type == "agentic/langgraph" or tracer_type == "langchain":
+                from  openinference.instrumentation.mcp import MCPInstrumentor
+                instrumentors += [(MCPInstrumentor, [])]
                 from openinference.instrumentation.langchain import LangChainInstrumentor
                 instrumentors += [(LangChainInstrumentor, [])]
             
@@ -313,12 +318,17 @@ class Tracer(AgenticTracing):
                 instrumentors += [(SmolagentsInstrumentor, [])]
 
             elif tracer_type == "agentic/openai_agents":
+                from  openinference.instrumentation.mcp import MCPInstrumentor
+                instrumentors += [(MCPInstrumentor, [])]
                 from openinference.instrumentation.openai_agents import OpenAIAgentsInstrumentor
                 instrumentors += [(OpenAIAgentsInstrumentor, [])]
             
             elif tracer_type == "google-adk":
+                from  openinference.instrumentation.mcp import MCPInstrumentor
+                instrumentors += [(MCPInstrumentor, [])]
                 from  openinference.instrumentation.google_adk import GoogleADKInstrumentor
                 instrumentors += [(GoogleADKInstrumentor, [])]
+
             else:
                 # Unknown agentic tracer type
                 logger.warning(f"Unknown agentic tracer type: {tracer_type}")
