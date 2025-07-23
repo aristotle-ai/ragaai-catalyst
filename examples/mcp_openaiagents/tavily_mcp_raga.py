@@ -21,11 +21,9 @@ tracer = Tracer(
     project_name=os.environ['RAGAAI_PROJECT_NAME'],
     dataset_name=os.environ['RAGAAI_DATASET_NAME'],
     tracer_type="agentic/openai_agents"
-    # tracer_type="mcp",
 )
 
 init_tracing(catalyst=catalyst, tracer=tracer)
-# Connect to your Phoenix instance
 
 
 async def run_tavily_mcp_client(mcp_server: MCPServer):

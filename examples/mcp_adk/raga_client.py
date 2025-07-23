@@ -30,7 +30,7 @@ catalyst = RagaAICatalyst(
 tracer = Tracer(
     project_name=os.environ['RAGAAI_PROJECT_NAME'],
     dataset_name=os.environ['RAGAAI_DATASET_NAME'],
-    tracer_type="mcp",
+    tracer_type="google-adk"
 )
 
 init_tracing(catalyst=catalyst, tracer=tracer)
