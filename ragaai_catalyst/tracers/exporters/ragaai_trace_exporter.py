@@ -69,7 +69,22 @@ class RAGATraceExporter(SpanExporter):
             external_id: Optional[str] = None
     ):
         self.trace_spans = dict()
-        self.tmp_dir = tempfile.gettempdir()
+        # Use custom trace directory if environment variable is set, otherwise use temp directory
+        custom_dir = os.getenv("RAGAAI_TRACE_DIR")
+        if custom_dir:
+            try:
+                # Create the directory if it doesn't exist
+                os.makedirs(custom_dir, exist_ok=True)
+                self.tmp_dir = custom_dir
+                logger.info(f"Using custom trace directory: {custom_dir}")
+            except Exception as e:
+                logger.warning(f"Error with custom trace directory {custom_dir}: {e}")
+                logger.info("Falling back to temp directory")
+                self.tmp_dir = tempfile.gettempdir()
+        else:
+            self.tmp_dir = tempfile.gettempdir()
+            logger.info(f"Using temp directory: {self.tmp_dir}")
+            
         self.tracer_type = tracer_type
         self.files_to_zip = files_to_zip
         self.project_name = project_name
@@ -228,8 +243,6 @@ class RAGATraceExporter(SpanExporter):
                 trace_file_path = os.path.join(self.tmp_dir, f"{trace_id}.json")
                 with open(trace_file_path, "w") as file:
                     json.dump(ragaai_trace, file, cls=TracerJSONEncoder, indent=2)
-                with open(os.path.join(os.getcwd(), 'rag_agent_traces.json'), 'w') as f:
-                    json.dump(ragaai_trace, f, cls=TracerJSONEncoder, indent=2)
             except Exception as e:
                 print(f"Error in saving trace json: {trace_id}: {e}")
                 return None
