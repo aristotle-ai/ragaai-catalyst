@@ -4,26 +4,48 @@ import pytest
 import subprocess
 import re
 import sys
+import glob
 from pathlib import Path
 
 # Add the parent directory to sys.path to import modules from there
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+
+# Define the trace directory based on environment variable or default to "trace_langchain"
+TRACE_DIR = os.environ.get("RAGAAI_TRACE_DIR", "trace_langchain")
+
+def get_latest_trace_file_path():
+    """
+    Get the path to the most recent trace file in the trace directory.
+    """
+    trace_dir_path = os.path.join(Path(__file__).resolve().parent, TRACE_DIR)
+    
+    # Get all JSON files in the trace directory
+    trace_files = glob.glob(os.path.join(trace_dir_path, "*.json"))
+    
+    if not trace_files:
+        return None
+    
+    # Return the most recently modified file
+    return max(trace_files, key=os.path.getmtime)
+
 def run_diagnosis_agent():
     """
     Run the diagnosis_agent.py script to generate traces.
     """
     script_path = os.path.join(Path(__file__).resolve().parent, "diagnosis_agent.py")
-    
+                                                                
     # Get the path to the current Python executable (which should be in the virtual environment)
-    # For direct script execution
     python_executable = sys.executable
     
-    # Run the diagnosis agent script
     try:
         print(f"Running diagnosis_agent.py using Python: {python_executable}")
         # First change to the correct directory
         current_dir = os.getcwd()
         os.chdir(Path(__file__).resolve().parent)
+        
+        # Set environment variable for trace directory
+        env = os.environ.copy()
+        env["RAGAAI_TRACE_DIR"] = TRACE_DIR
         
         cmd = [python_executable, script_path, "--model_type", "openai"]
         print(f"Executing command: {' '.join(cmd)}")
@@ -32,7 +54,8 @@ def run_diagnosis_agent():
             cmd,
             capture_output=True,
             text=True,
-            check=False  # Don't raise exception on non-zero exit code
+            check=False,
+            env=env  # Pass the environment with RAGAAI_TRACE_DIR set
         )
         
         # Change back to original directory
@@ -42,19 +65,21 @@ def run_diagnosis_agent():
         print(f"stdout: {result.stdout}")
         print(f"stderr: {result.stderr}")
         
-        # Check if the trace file was generated
-        trace_file_path = os.path.join(
-            Path(__file__).resolve().parent, 
-            "rag_agent_traces.json"
-        )
+        # Check if any trace file was generated
+        trace_file_path = get_latest_trace_file_path()
         
-        if os.path.exists(trace_file_path):
+        if trace_file_path and os.path.exists(trace_file_path):
             print(f"Trace file successfully generated at: {trace_file_path}")
             return True
         else:
             # Try running a direct shell command as a fallback
-            print(f"Warning: Trace file not found after running diagnosis_agent.py. Trying shell command...")
-            shell_cmd = f"cd {Path(__file__).resolve().parent} && {python_executable} {script_path} --model_type openai"
+            print(f"Warning: No trace file found after running diagnosis_agent.py. Trying shell command...")
+            
+            # Make sure the trace directory exists
+            trace_dir_path = os.path.join(Path(__file__).resolve().parent, TRACE_DIR)
+            os.makedirs(trace_dir_path, exist_ok=True)
+            
+            shell_cmd = f"cd {Path(__file__).resolve().parent} && RAGAAI_TRACE_DIR={TRACE_DIR} {python_executable} {script_path} --model_type openai"
             print(f"Executing shell command: {shell_cmd}")
             
             shell_result = subprocess.run(
@@ -69,11 +94,12 @@ def run_diagnosis_agent():
             print(f"Shell stdout: {shell_result.stdout}")
             print(f"Shell stderr: {shell_result.stderr}")
             
-            if os.path.exists(trace_file_path):
+            trace_file_path = get_latest_trace_file_path()
+            if trace_file_path and os.path.exists(trace_file_path):
                 print(f"Trace file successfully generated via shell command at: {trace_file_path}")
                 return True
             else:
-                print(f"Warning: Trace file still not found after trying shell command")
+                print(f"Warning: No trace file found after trying shell command")
                 return False
             
     except Exception as e:
@@ -83,16 +109,11 @@ def run_diagnosis_agent():
 def test_trace_total_cost():
     """
     Test that verifies the total cost value in the trace file is correct.
-    This test first checks if the trace file exists, and if not, runs the diagnosis_agent.py
-    script to generate a new trace file, then validates the cost values in that trace.
     """
-    trace_file_path = os.path.join(
-        Path(__file__).resolve().parent, 
-        "rag_agent_traces.json"
-    )
+    trace_file_path = get_latest_trace_file_path()
     
     # Verify the trace file exists before proceeding
-    assert os.path.exists(trace_file_path), f"Trace file not found: {trace_file_path}"
+    assert trace_file_path and os.path.exists(trace_file_path), f"No trace file found in {TRACE_DIR} directory"
     
     # Load the trace file
     with open(trace_file_path, 'r') as f:
@@ -115,16 +136,11 @@ def test_trace_total_cost():
 def test_llm_cost_calculation():
     """
     Test that verifies the LiteLLM cost calculation bug fix.
-    
-    This test focuses on:
-    1. Correctly parsing prompt_tokens and completion_tokens from LiteLLM responses
-    2. Ensuring costs are calculated properly using model-specific rates (input_cost_per_token and output_cost_per_token)
     """
-    # Load a trace file that contains LiteLLM or OpenAI call data
-    trace_file_path = os.path.join(
-        Path(__file__).resolve().parent, 
-        "rag_agent_traces.json"
-    )
+    trace_file_path = get_latest_trace_file_path()
+    
+    # Verify the trace file exists before proceeding
+    assert trace_file_path and os.path.exists(trace_file_path), f"No trace file found in {TRACE_DIR} directory"
     
     # Load the trace file
     with open(trace_file_path, 'r') as f:
@@ -204,11 +220,10 @@ def test_export_trace_id():
     """
     Test that exports top-level keys from the trace file and checks for 'id' field.
     """
-    # Load the trace file
-    trace_file_path = os.path.join(
-        Path(__file__).resolve().parent, 
-        "rag_agent_traces.json"
-    )
+    trace_file_path = get_latest_trace_file_path()
+    
+    # Verify the trace file exists before proceeding
+    assert trace_file_path and os.path.exists(trace_file_path), f"No trace file found in {TRACE_DIR} directory"
     
     # Load the trace file
     with open(trace_file_path, 'r') as f:
@@ -229,11 +244,10 @@ def test_export_trace_metadata():
     """
     Test that exports top-level keys from the trace file and checks for 'metadata' field.
     """
-    # Load the trace file
-    trace_file_path = os.path.join(
-        Path(__file__).resolve().parent, 
-        "rag_agent_traces.json"
-    )
+    trace_file_path = get_latest_trace_file_path()
+    
+    # Verify the trace file exists before proceeding
+    assert trace_file_path and os.path.exists(trace_file_path), f"No trace file found in {TRACE_DIR} directory"
     
     # Load the trace file
     with open(trace_file_path, 'r') as f:
@@ -254,11 +268,10 @@ def test_export_trace_data():
     """
     Test that exports top-level keys from the trace file and checks for 'data' field.
     """
-    # Load the trace file
-    trace_file_path = os.path.join(
-        Path(__file__).resolve().parent, 
-        "rag_agent_traces.json"
-    )
+    trace_file_path = get_latest_trace_file_path()
+    
+    # Verify the trace file exists before proceeding
+    assert trace_file_path and os.path.exists(trace_file_path), f"No trace file found in {TRACE_DIR} directory"
     
     # Load the trace file
     with open(trace_file_path, 'r') as f:
@@ -278,14 +291,11 @@ def test_export_trace_data():
 def test_exclude_vital_columns():
     """
     Test that verifies vital columns are excluded while masking.
-    This test checks that fields like model_name, cost, latency, span_id, trace_id, etc.
-    are not present in the exported trace data or redacted with <REDACTED TEXT>.
     """
-    # Load the trace file
-    trace_file_path = os.path.join(
-        Path(__file__).resolve().parent, 
-        "rag_agent_traces.json"
-    )
+    trace_file_path = get_latest_trace_file_path()
+    
+    # Verify the trace file exists before proceeding
+    assert trace_file_path and os.path.exists(trace_file_path), f"No trace file found in {TRACE_DIR} directory"
     
     # Load the trace file
     with open(trace_file_path, 'r') as f:
@@ -329,13 +339,11 @@ def test_exclude_vital_columns():
 def test_span_kind_not_null():
     """
     Test that verifies the 'kind' field in each span is not null.
-    This ensures that all spans have a properly defined kind value.
     """
-    # Load the trace file
-    trace_file_path = os.path.join(
-        Path(__file__).resolve().parent, 
-        "rag_agent_traces.json"
-    )
+    trace_file_path = get_latest_trace_file_path()
+    
+    # Verify the trace file exists before proceeding
+    assert trace_file_path and os.path.exists(trace_file_path), f"No trace file found in {TRACE_DIR} directory"
     
     # Load the trace file
     with open(trace_file_path, 'r') as f:
@@ -367,33 +375,30 @@ def setup_traces():
     """
     Session-level fixture to ensure traces are generated before running tests.
     """
-    trace_file_path = os.path.join(
-        Path(__file__).resolve().parent, 
-        "rag_agent_traces.json"
-    )
+    # Make sure the trace directory exists
+    trace_dir_path = os.path.join(Path(__file__).resolve().parent, TRACE_DIR)
+    os.makedirs(trace_dir_path, exist_ok=True)
     
-    if os.path.exists(trace_file_path):
-        os.remove(trace_file_path)
-        print("Removed existing trace file to generate new traces")
+    trace_file_path = get_latest_trace_file_path()
     
-    # Now the file doesn't exist, so it will always generate new traces
-
-    success = run_diagnosis_agent()
-    
-    # Check again if trace file exists after attempting to run diagnosis_agent.py
-    if not os.path.exists(trace_file_path):
-        pytest.skip("Trace file could not be generated. Skipping tests instead of failing.")
+    # Check if any trace file exists, if not run the diagnosis agent
+    if not trace_file_path:
+        print(f"No trace file found in {TRACE_DIR} directory, running diagnosis_agent.py to generate it")
+        success = run_diagnosis_agent()
+        
+        # Check again if trace file exists after attempting to run diagnosis_agent.py
+        trace_file_path = get_latest_trace_file_path()
+        if not trace_file_path:
+            pytest.skip("Trace file could not be generated. Skipping tests instead of failing.")
 
 if __name__ == "__main__":
     # First ensure we have trace data
     setup_traces()
     
-    trace_file_path = os.path.join(
-        Path(__file__).resolve().parent, 
-        "rag_agent_traces.json"
-    )
+    trace_file_path = get_latest_trace_file_path()
     
-    if os.path.exists(trace_file_path):
+    if trace_file_path and os.path.exists(trace_file_path):
+        print(f"Using trace file: {trace_file_path}")
         # Then run all tests
         test_trace_total_cost()
         test_llm_cost_calculation()
@@ -403,5 +408,4 @@ if __name__ == "__main__":
         test_exclude_vital_columns()
         test_span_kind_not_null()
     else:
-        print("ERROR: Could not generate trace file. Tests cannot be run.")
-        
+        print(f"ERROR: No trace file found in {TRACE_DIR} directory. Tests cannot be run.")

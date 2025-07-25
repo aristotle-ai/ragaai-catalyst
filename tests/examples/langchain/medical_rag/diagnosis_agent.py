@@ -1,4 +1,3 @@
-
 import os
 import warnings
 from typing import List, Dict
@@ -19,7 +18,16 @@ from ragaai_catalyst import RagaAICatalyst, init_tracing
 from ragaai_catalyst.tracers import Tracer
 
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(".env",encoding="utf-8")
+
+# Get the directory where this script is located
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Define paths relative to the script directory
+MEDICAL_TEXTS_DIR = os.path.join(SCRIPT_DIR, "data/medical_texts")
+SYMPTOM_MAP_CSV = os.path.join(SCRIPT_DIR, "data/symptom_disease_map.csv")
+EMBEDDINGS_MODEL = "all-MiniLM-L6-v2"
+
 
 catalyst = RagaAICatalyst(
     access_key=os.getenv('RAGAAI_CATALYST_ACCESS_KEY'), 
@@ -42,9 +50,6 @@ tracer = Tracer(
 
 init_tracing(catalyst=catalyst, tracer=tracer)
 
-MEDICAL_TEXTS_DIR = "data/medical_texts"
-SYMPTOM_MAP_CSV = "data/symptom_disease_map.csv"
-EMBEDDINGS_MODEL = "all-MiniLM-L6-v2"
 
 class MedicalDataLoader:
     @staticmethod
