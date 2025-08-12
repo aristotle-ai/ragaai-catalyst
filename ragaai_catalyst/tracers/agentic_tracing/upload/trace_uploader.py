@@ -288,6 +288,9 @@ def process_upload(task_id: str, filepath: str, hash_id: str, zip_path: str,
                 upload_success = upload_traces.upload_agentic_traces()
                 if upload_success:
                     logger.info("Agentic traces uploaded successfully")
+                    if os.getenv("DELETE_RAGAAI_TRACE_JSON"):
+                        os.remove(filepath)
+                        logger.info(f"Deleted trace file {filepath}")
                 else:
                     error_msg = "Agentic traces upload failed"
                     logger.error(error_msg)
