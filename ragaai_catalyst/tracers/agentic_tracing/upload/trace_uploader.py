@@ -290,7 +290,7 @@ def process_upload(task_id: str, filepath: str, hash_id: str, zip_path: str,
                     logger.info("Agentic traces uploaded successfully")
                     if os.getenv("DELETE_RAGAAI_TRACE_JSON"):
                         os.remove(filepath)
-                        logger.info(f"Deleted trace file {filepath}")
+                        logger.info(f"Deleted trace file after successful upload: {filepath}")
                 else:
                     error_msg = "Agentic traces upload failed"
                     logger.error(error_msg)
@@ -333,10 +333,17 @@ def process_upload(task_id: str, filepath: str, hash_id: str, zip_path: str,
                         logger.error(error_msg)
                     else:
                         logger.info(f"Code hash uploaded successfully: {response}")
+                        if os.getenv("DELETE_RAGAAI_TRACE_JSON"):
+                            os.remove(zip_path)
+                            logger.info(f"Deleted zip file after successful upload: {zip_path}")
                 except Exception as e:
                     logger.error(f"Error uploading code hash: {e}")
             else:
                 logger.warning(f"Code zip {zip_path} not found, skipping code upload")
+        else:
+            if os.getenv("DELETE_RAGAAI_TRACE_JSON"):
+                os.remove(zip_path)
+                # logger.info(f"Deleted unused zip file {zip_path}")
 
         # Mark task as completed
         result["status"] = STATUS_COMPLETED
