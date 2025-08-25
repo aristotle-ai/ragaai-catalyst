@@ -722,6 +722,23 @@ class Tracer(AgenticTracing):
         This method updates the feedback on a specifc trace with a given external_id
         """
         try:
+            # Validate all required parameters
+            if not project_name:
+                logger.error("project_name is required but not provided in set_feedback")
+                return None
+            
+            if not dataset_name:
+                logger.error("dataset_name is required but not provided in set_feedback")
+                return None
+            
+            if not external_id:
+                logger.error("external_id is required but not provided in set_feedback")
+                return None
+            
+            if feedback is None:
+                logger.error("feedback is required but not provided in set_feedback")
+                return None
+            
             project_id = self._get_project_id(project_name)
             if project_id is None:
                 logger.error(f"Project {project_name} not found")
