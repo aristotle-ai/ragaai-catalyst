@@ -716,3 +716,110 @@ class Tracer(AgenticTracing):
         """
         self.dynamic_exporter.project_name = project_name
         logger.debug(f"Updated dynamic exporter's project_name to {project_name}")
+    
+    def set_feedback(self, project_name, dataset_name, external_id, feedback):
+        """
+        This method updates the feedback on a specifc trace with a given external_id
+        """
+        try:
+            # Validate all required parameters
+            if not project_name:
+                logger.error("project_name is required but not provided in set_feedback")
+                return None
+            
+            if not dataset_name:
+                logger.error("dataset_name is required but not provided in set_feedback")
+                return None
+            
+            if not external_id:
+                logger.error("external_id is required but not provided in set_feedback")
+                return None
+            
+            if feedback is None:
+                logger.error("feedback is required but not provided in set_feedback")
+                return None
+            
+            project_id = self._get_project_id(project_name)
+            if project_id is None:
+                logger.error(f"Project {project_name} not found")
+                return None
+            
+            feedback_response = self._set_feedback(project_id, dataset_name, external_id, feedback)
+            if feedback_response is None:
+                logger.error(f"Failed to set feedback for project {project_name} with external_id {external_id}")
+                return None
+            else:
+                logger.info(f"Feedback set successfully for project {project_name} with external_id {external_id}")
+                return feedback_response
+        except Exception as e:
+            logger.error(f"Error in set_feedback: {str(e)}")
+            return None
+        
+
+    def _get_project_id(self, project_name):
+        try:
+            base_url = f"{self.base_url}/v2/llm/project?name={project_name}"
+            headers={
+                        'Accept': 'application/json, text/plain, */*',
+                        'Authorization': f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
+                    }
+            payload = {}
+            timeout=self.timeout
+            response = requests.request("GET", base_url, headers=headers, data=payload, timeout=timeout)
+
+            if response.status_code == 200:
+                return response.json().get('data', {}).get('id', None)
+            elif response.status_code == 404:
+                logger.error(response.json().get('message', ''))
+                return None
+            elif response.status_code == 400:
+                logger.error(response.json().get('message', ''))
+                return None
+            else:
+                logger.error(f"Failed to get project id for project {project_name}")
+                return None
+        except Exception as e:
+            logger.error(f"Error in _get_project_id: {str(e)}")
+            return None
+    
+    def _set_feedback(self, project_id, dataset_name, external_id, feedback):
+        try:
+            base_url = f"{self.base_url}/v1/llm/feedback"
+            headers={
+                        'Accept': 'application/json, text/plain, */*',
+                        'Authorization': f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
+                        'X-Project-Id': str(project_id),
+                        'Content-Type': 'application/json'
+                    }
+            payload = json.dumps({
+                    "externalId": str(external_id),
+                    "feedbackColumnName": "_Response-feedBack",
+                    "feedback": feedback,
+                    "datasetName": dataset_name
+                    })
+            timeout=self.timeout
+            response = requests.request("POST", base_url, headers=headers, data=payload, timeout=timeout)
+            if response.json().get('data', {}).get('status', '') == 200:
+                return response.json().get('data', {}).get('message', '')
+            
+            elif response.json().get('data', {}).get('status', '') == 404:
+                #No externalId found
+                logger.error(response.json().get('data', {}).get('message', ''))
+                return None
+
+            elif response.json().get('status', '') == 404:
+                #No Dataset found
+                logger.error(response.json().get('message', ''))
+                return None
+
+            elif response.json().get('status', '') == 400:
+                #Invalid feedback
+                logger.error(response.json().get('message', ''))
+                return None
+            
+            else:
+                logger.error("Failed to set feedback")
+                return None
+        except Exception as e:
+            logger.error(f"Error in _set_feedback: {str(e)}")
+            return None
