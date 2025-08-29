@@ -18,6 +18,10 @@ from ragaai_catalyst.tracers.exporters.file_span_exporter import FileSpanExporte
 from ragaai_catalyst.tracers.utils import get_unique_key
 from openinference.instrumentation.langchain import LangChainInstrumentor
 from ragaai_catalyst import RagaAICatalyst
+from .agentic_tracing.upload.session_manager import session_manager
+from urllib3.exceptions import PoolError, MaxRetryError, NewConnectionError
+from requests.exceptions import ConnectionError, Timeout
+from http.client import RemoteDisconnected
 from ragaai_catalyst.tracers.agentic_tracing import AgenticTracing
 from ragaai_catalyst.tracers.exporters.ragaai_trace_exporter import RAGATraceExporter
 from ragaai_catalyst.tracers.agentic_tracing.utils.file_name_tracker import TrackName
@@ -765,7 +769,7 @@ class Tracer(AgenticTracing):
                     }
             payload = {}
             timeout=self.timeout
-            response = requests.request("GET", base_url, headers=headers, data=payload, timeout=timeout)
+            response = session_manager.make_request_with_retry("GET", base_url, headers=headers, data=payload, timeout=timeout)
 
             if response.status_code == 200:
                 return response.json().get('data', {}).get('id', None)
@@ -778,6 +782,9 @@ class Tracer(AgenticTracing):
             else:
                 logger.error(f"Failed to get project id for project {project_name}")
                 return None
+        except (PoolError, MaxRetryError, NewConnectionError, ConnectionError, Timeout, RemoteDisconnected) as e:
+            session_manager.handle_request_exceptions(e, "getting project ID")
+            return None
         except Exception as e:
             logger.error(f"Error in _get_project_id: {str(e)}")
             return None
@@ -798,7 +805,7 @@ class Tracer(AgenticTracing):
                     "datasetName": dataset_name
                     })
             timeout=self.timeout
-            response = requests.request("POST", base_url, headers=headers, data=payload, timeout=timeout)
+            response = session_manager.make_request_with_retry("POST", base_url, headers=headers, data=payload, timeout=timeout)
             if response.json().get('data', {}).get('status', '') == 200:
                 return response.json().get('data', {}).get('message', '')
             
@@ -820,6 +827,9 @@ class Tracer(AgenticTracing):
             else:
                 logger.error("Failed to set feedback")
                 return None
+        except (PoolError, MaxRetryError, NewConnectionError, ConnectionError, Timeout, RemoteDisconnected) as e:
+            session_manager.handle_request_exceptions(e, "setting feedback")
+            return None
         except Exception as e:
             logger.error(f"Error in _set_feedback: {str(e)}")
             return None
