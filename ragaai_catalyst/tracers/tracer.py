@@ -743,7 +743,17 @@ class Tracer(AgenticTracing):
                 logger.error("feedback is required but not provided in set_feedback")
                 return None
             
-            project_id = self._get_project_id(project_name)
+            response = self._get_project_id(project_name)
+            if response.status_code == 200:
+                project_id = response.json().get('data', {}).get('id', None)
+                logger.info(f"Project {project_name} found with project id {project_id}")
+            elif response.status_code == 404:
+                logger.error(response.json().get('message', ''))
+                return response.json()
+            else:
+                logger.error(f"Failed to get project id for project {project_name}")
+                return response.json()
+            
             if project_id is None:
                 logger.error(f"Project {project_name} not found")
                 return None
@@ -770,18 +780,7 @@ class Tracer(AgenticTracing):
             payload = {}
             timeout=self.timeout
             response = session_manager.make_request_with_retry("GET", base_url, headers=headers, data=payload, timeout=timeout)
-
-            if response.status_code == 200:
-                return response.json().get('data', {}).get('id', None)
-            elif response.status_code == 404:
-                logger.error(response.json().get('message', ''))
-                return None
-            elif response.status_code == 400:
-                logger.error(response.json().get('message', ''))
-                return None
-            else:
-                logger.error(f"Failed to get project id for project {project_name}")
-                return None
+            return response
         except (PoolError, MaxRetryError, NewConnectionError, ConnectionError, Timeout, RemoteDisconnected) as e:
             session_manager.handle_request_exceptions(e, "getting project ID")
             return None
@@ -807,22 +806,22 @@ class Tracer(AgenticTracing):
             timeout=self.timeout
             response = session_manager.make_request_with_retry("POST", base_url, headers=headers, data=payload, timeout=timeout)
             if response.json().get('data', {}).get('status', '') == 200:
-                return response.json().get('data', {}).get('message', '')
+                return response.json()
             
             elif response.json().get('data', {}).get('status', '') == 404:
                 #No externalId found
-                logger.error(response.json().get('data', {}).get('message', ''))
-                return None
+                logger.error(response.json())
+                return response.json()
 
             elif response.json().get('status', '') == 404:
                 #No Dataset found
-                logger.error(response.json().get('message', ''))
-                return None
+                logger.error(response.json())
+                return response.json()
 
             elif response.json().get('status', '') == 400:
                 #Invalid feedback
-                logger.error(response.json().get('message', ''))
-                return None
+                logger.error(response.json())
+                return response.json()
             
             else:
                 logger.error("Failed to set feedback")
