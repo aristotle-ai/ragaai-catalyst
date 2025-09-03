@@ -811,17 +811,17 @@ class Tracer(AgenticTracing):
             
             elif response.json().get('data', {}).get('status', '') == 404:
                 #No externalId found
-                logger.error(response.json())
+                logger.error(response.json().get('data', {}).get('message', ''))
                 return response.json()
 
             elif response.json().get('status', '') == 404:
                 #No Dataset found
-                logger.error(response.json())
+                logger.error(response.json().get('message', ''))
                 return response.json()
 
             elif response.json().get('status', '') == 400:
                 #Invalid feedback
-                logger.error(response.json())
+                logger.error(response.json().get('message', ''))
                 return response.json()
             
             else:
