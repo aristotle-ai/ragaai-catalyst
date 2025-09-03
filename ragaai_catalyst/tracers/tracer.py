@@ -746,7 +746,7 @@ class Tracer(AgenticTracing):
             response = self._get_project_id(project_name)
             if response.status_code == 200:
                 project_id = response.json().get('data', {}).get('id', None)
-                logger.info(f"Project {project_name} found with project id {project_id}")
+                logger.debug(f"Project {project_name} found with project id {project_id}")
             elif response.status_code == 404:
                 logger.error(response.json().get('message', ''))
                 return response.json()
@@ -763,7 +763,6 @@ class Tracer(AgenticTracing):
                 logger.error(f"Failed to set feedback for project {project_name} with external_id {external_id}")
                 return None
             else:
-                logger.info(f"Feedback set successfully for project {project_name} with external_id {external_id}")
                 return feedback_response
         except Exception as e:
             logger.error(f"Error in set_feedback: {str(e)}")
@@ -806,6 +805,7 @@ class Tracer(AgenticTracing):
             timeout=self.timeout
             response = session_manager.make_request_with_retry("POST", base_url, headers=headers, data=payload, timeout=timeout)
             if response.json().get('data', {}).get('status', '') == 200:
+                logger.info(f"{response.json().get('data', {}).get('message', '')} for project {project_id} with external_id {external_id}")
                 return response.json()
             
             elif response.json().get('data', {}).get('status', '') == 404:
