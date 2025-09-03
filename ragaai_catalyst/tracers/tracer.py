@@ -751,14 +751,15 @@ class Tracer(AgenticTracing):
                 logger.error(response.json().get('message', ''))
                 return response.json()
             else:
-                logger.error(f"Failed to get project id for project {project_name}")
+                logger.debug(f"Failed to get project id for project {project_name}")
+                logger.error(f"Project {project_name} not found. Please enter a valid project name")
                 return response.json()
             
             if project_id is None:
                 logger.error(f"Project {project_name} not found")
                 return None
             
-            feedback_response = self._set_feedback(project_id, dataset_name, external_id, feedback)
+            feedback_response = self._set_feedback(project_name, project_id, dataset_name, external_id, feedback)
             if feedback_response is None:
                 logger.error(f"Failed to set feedback for project {project_name} with external_id {external_id}")
                 return None
@@ -787,7 +788,7 @@ class Tracer(AgenticTracing):
             logger.error(f"Error in _get_project_id: {str(e)}")
             return None
     
-    def _set_feedback(self, project_id, dataset_name, external_id, feedback):
+    def _set_feedback(self, project_name, project_id, dataset_name, external_id, feedback):
         try:
             base_url = f"{self.base_url}/v1/llm/feedback"
             headers={
@@ -805,7 +806,7 @@ class Tracer(AgenticTracing):
             timeout=self.timeout
             response = session_manager.make_request_with_retry("POST", base_url, headers=headers, data=payload, timeout=timeout)
             if response.json().get('data', {}).get('status', '') == 200:
-                logger.info(f"{response.json().get('data', {}).get('message', '')} for project {project_id} with external_id {external_id}")
+                logger.info(f"{response.json().get('data', {}).get('message', '')} for project {project_name} with external_id {external_id}")
                 return response.json()
             
             elif response.json().get('data', {}).get('status', '') == 404:
