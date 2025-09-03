@@ -722,14 +722,14 @@ class Tracer(AgenticTracing):
         self.dynamic_exporter.project_name = project_name
         logger.debug(f"Updated dynamic exporter's project_name to {project_name}")
     
-    def set_feedback(self, project_name, dataset_name, external_id, feedback):
+    def set_feedback(self, project_id, dataset_name, external_id, feedback):
         """
         This method updates the feedback on a specifc trace with a given external_id
         """
         try:
             # Validate all required parameters
-            if not project_name:
-                logger.error("project_name is required but not provided in set_feedback")
+            if not project_id:
+                logger.error("project_id is required but not provided in set_feedback")
                 return None
             
             if not dataset_name:
@@ -744,25 +744,25 @@ class Tracer(AgenticTracing):
                 logger.error("feedback is required but not provided in set_feedback")
                 return None
             
-            response = self._get_project_id(project_name)
-            if response.status_code == 200:
-                project_id = response.json().get('data', {}).get('id', None)
-                logger.debug(f"Project {project_name} found with project id {project_id}")
-            elif response.status_code == 404:
-                logger.error(response.json().get('message', ''))
-                return response.json()
-            else:
-                logger.debug(f"Failed to get project id for project {project_name}")
-                logger.error(f"Project {project_name} not found. Please enter a valid project name")
-                return response.json()
+            # response = self._get_project_id(project_name)
+            # if response.status_code == 200:
+            #     project_id = response.json().get('data', {}).get('id', None)
+            #     logger.debug(f"Project {project_name} found with project id {project_id}")
+            # elif response.status_code == 404:
+            #     logger.error(response.json().get('message', ''))
+            #     return response.json()
+            # else:
+            #     logger.debug(f"Failed to get project id for project {project_name}")
+            #     logger.error(f"Project {project_name} not found. Please enter a valid project name")
+            #     return response.json()
             
-            if project_id is None:
-                logger.error(f"Project {project_name} not found")
-                return None
+            # if project_id is None:
+            #     logger.error(f"Project {project_name} not found")
+            #     return None
             
-            feedback_response = self._set_feedback(project_name, project_id, dataset_name, external_id, feedback)
+            feedback_response = self._set_feedback(project_id, dataset_name, external_id, feedback)
             if feedback_response is None:
-                logger.error(f"Failed to set feedback for project {project_name} with external_id {external_id}")
+                logger.error(f"Failed to set feedback for project id {project_id} with external_id {external_id}")
                 return None
             else:
                 return feedback_response
@@ -771,7 +771,7 @@ class Tracer(AgenticTracing):
             return None
         
 
-    def _get_project_id(self, project_name):
+    def get_project_id(self, project_name):
         try:
             base_url = f"{self.base_url}/v2/llm/project?name={project_name}"
             headers={
@@ -781,7 +781,20 @@ class Tracer(AgenticTracing):
             payload = {}
             timeout=self.timeout
             response = session_manager.make_request_with_retry("GET", base_url, headers=headers, data=payload, timeout=timeout)
-            return response
+            if response.status_code == 200:
+                project_id = response.json().get('data', {}).get('id', None)
+                if project_id is None:
+                    logger.error(f"Project {project_name} not found")
+                    return None
+                logger.info(f"Project {project_name} found with project id {project_id}")
+                return project_id
+            elif response.status_code == 404:
+                logger.error(response.json().get('message', ''))
+                return response.json()
+            else:
+                logger.debug(f"Failed to get project id for project {project_name}")
+                logger.error(f"Project {project_name} not found. Please enter a valid project name")
+                return response.json()
         except (PoolError, MaxRetryError, NewConnectionError, ConnectionError, Timeout, RemoteDisconnected) as e:
             session_manager.handle_request_exceptions(e, "getting project ID")
             return None
@@ -789,7 +802,7 @@ class Tracer(AgenticTracing):
             logger.error(f"Error in _get_project_id: {str(e)}")
             return None
     
-    def _set_feedback(self, project_name, project_id, dataset_name, external_id, feedback):
+    def _set_feedback(self, project_id, dataset_name, external_id, feedback):
         try:
             base_url = f"{self.base_url}/v1/llm/feedback"
             headers={
@@ -807,7 +820,7 @@ class Tracer(AgenticTracing):
             timeout=self.timeout
             response = session_manager.make_request_with_retry("POST", base_url, headers=headers, data=payload, timeout=timeout)
             if response.json().get('data', {}).get('status', '') == 200:
-                logger.info(f"{response.json().get('data', {}).get('message', '')} for project {project_name} with external_id {external_id}")
+                logger.info(f"{response.json().get('data', {}).get('message', '')} for project id {project_id} with external_id {external_id}")
                 return response.json()
             
             elif response.json().get('data', {}).get('status', '') == 404:
