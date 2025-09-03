@@ -161,7 +161,7 @@ class Tracer(AgenticTracing):
                 project["name"] for project in response.json()["data"]["content"]
             ]
             if project_name not in project_list:
-                logger.error("Project not found. Please enter a valid project name")
+                logger.error(f"Project {project_name} not found. Please enter a valid project name")
             else:
             
                 self.project_id = [
