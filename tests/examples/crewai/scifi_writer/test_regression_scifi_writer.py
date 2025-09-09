@@ -15,8 +15,8 @@ def run_diagnosis_agent():
     script_path = os.path.join(Path(__file__).resolve().parent, "scifi_writer.py")
     
     # Get the path to the current Python executable (which should be in the virtual environment)
-    # For direct script execution
     python_executable = sys.executable
+    
     # Run the diagnosis agent script
     try:
         print(f"Running scifi_writer.py using Python: {python_executable}")
@@ -24,8 +24,8 @@ def run_diagnosis_agent():
         current_dir = os.getcwd()
         os.chdir(Path(__file__).resolve().parent)
         
-        cmd = [python_executable, script_path, "--info", "testing-with-openai"]
-
+        # Use the correct command line arguments
+        cmd = [python_executable, script_path, "--info", "testing-scifi-writer"]
         print(f"Executing command: {' '.join(cmd)}")
         
         result = subprocess.run(
@@ -42,19 +42,19 @@ def run_diagnosis_agent():
         print(f"stdout: {result.stdout}")
         print(f"stderr: {result.stderr}")
         
-        # Check if the trace file was generated
-        trace_file_path = os.path.join(
+        # Check if the trace directory was generated
+        trace_dir_path = os.path.join(
             Path(__file__).resolve().parent, 
-            "rag_agent_traces.json"
+            "rag_agent_traces"
         )
         
-        if os.path.exists(trace_file_path):
-            print(f"Trace file successfully generated at: {trace_file_path}")
+        if os.path.exists(trace_dir_path) and os.listdir(trace_dir_path):
+            print(f"Trace file successfully generated at: {trace_dir_path}")
             return True
         else:
             # Try running a direct shell command as a fallback
             print(f"Warning: Trace file not found after running scifi_writer.py. Trying shell command...")
-            shell_cmd = f"cd {Path(__file__).resolve().parent} && {python_executable} {script_path} --info testing-with-openai"
+            shell_cmd = f"cd {Path(__file__).resolve().parent} && {python_executable} {script_path} --info testing-scifi-writer"
             print(f"Executing shell command: {shell_cmd}")
             
             shell_result = subprocess.run(
@@ -69,8 +69,8 @@ def run_diagnosis_agent():
             print(f"Shell stdout: {shell_result.stdout}")
             print(f"Shell stderr: {shell_result.stderr}")
             
-            if os.path.exists(trace_file_path):
-                print(f"Trace file successfully generated via shell command at: {trace_file_path}")
+            if os.path.exists(trace_dir_path) and os.listdir(trace_dir_path):
+                print(f"Trace file successfully generated via shell command at: {trace_dir_path}")
                 return True
             else:
                 print(f"Warning: Trace file still not found after trying shell command")
@@ -86,13 +86,20 @@ def test_trace_total_cost():
     This test first checks if the trace file exists, and if not, runs the scifi_writer.py
     script to generate a new trace file, then validates the cost values in that trace.
     """
-    trace_file_path = os.path.join(
+    trace_dir_path = os.path.join(
         Path(__file__).resolve().parent, 
-        "rag_agent_traces.json"
+        "rag_agent_traces"
     )
     
-    # Verify the trace file exists before proceeding
-    assert os.path.exists(trace_file_path), f"Trace file not found: {trace_file_path}"
+    # Verify the trace directory exists before proceeding
+    assert os.path.exists(trace_dir_path), f"Trace directory not found: {trace_dir_path}"
+    
+    # Get the JSON files in the directory
+    json_files = [f for f in os.listdir(trace_dir_path) if f.endswith('.json')]
+    assert json_files, f"No JSON files found in trace directory: {trace_dir_path}"
+    
+    # Use the first JSON file
+    trace_file_path = os.path.join(trace_dir_path, json_files[0])
     
     # Load the trace file
     with open(trace_file_path, 'r') as f:
@@ -121,10 +128,17 @@ def test_llm_cost_calculation():
     2. Ensuring costs are calculated properly using model-specific rates (input_cost_per_token and output_cost_per_token)
     """
     # Load a trace file that contains LiteLLM or OpenAI call data
-    trace_file_path = os.path.join(
+    trace_dir_path = os.path.join(
         Path(__file__).resolve().parent, 
-        "rag_agent_traces.json"
+        "rag_agent_traces"
     )
+    
+    # Get the JSON files in the directory
+    json_files = [f for f in os.listdir(trace_dir_path) if f.endswith('.json')]
+    assert json_files, f"No JSON files found in trace directory: {trace_dir_path}"
+    
+    # Use the first JSON file
+    trace_file_path = os.path.join(trace_dir_path, json_files[0])
     
     # Load the trace file
     with open(trace_file_path, 'r') as f:
@@ -205,10 +219,17 @@ def test_export_trace_id():
     Test that exports top-level keys from the trace file and checks for 'id' field.
     """
     # Load the trace file
-    trace_file_path = os.path.join(
+    trace_dir_path = os.path.join(
         Path(__file__).resolve().parent, 
-        "rag_agent_traces.json"
+        "rag_agent_traces"
     )
+    
+    # Get the JSON files in the directory
+    json_files = [f for f in os.listdir(trace_dir_path) if f.endswith('.json')]
+    assert json_files, f"No JSON files found in trace directory: {trace_dir_path}"
+    
+    # Use the first JSON file
+    trace_file_path = os.path.join(trace_dir_path, json_files[0])
     
     # Load the trace file
     with open(trace_file_path, 'r') as f:
@@ -230,10 +251,17 @@ def test_export_trace_metadata():
     Test that exports top-level keys from the trace file and checks for 'metadata' field.
     """
     # Load the trace file
-    trace_file_path = os.path.join(
+    trace_dir_path = os.path.join(
         Path(__file__).resolve().parent, 
-        "rag_agent_traces.json"
+        "rag_agent_traces"
     )
+    
+    # Get the JSON files in the directory
+    json_files = [f for f in os.listdir(trace_dir_path) if f.endswith('.json')]
+    assert json_files, f"No JSON files found in trace directory: {trace_dir_path}"
+    
+    # Use the first JSON file
+    trace_file_path = os.path.join(trace_dir_path, json_files[0])
     
     # Load the trace file
     with open(trace_file_path, 'r') as f:
@@ -255,10 +283,17 @@ def test_export_trace_data():
     Test that exports top-level keys from the trace file and checks for 'data' field.
     """
     # Load the trace file
-    trace_file_path = os.path.join(
+    trace_dir_path = os.path.join(
         Path(__file__).resolve().parent, 
-        "rag_agent_traces.json"
+        "rag_agent_traces"
     )
+    
+    # Get the JSON files in the directory
+    json_files = [f for f in os.listdir(trace_dir_path) if f.endswith('.json')]
+    assert json_files, f"No JSON files found in trace directory: {trace_dir_path}"
+    
+    # Use the first JSON file
+    trace_file_path = os.path.join(trace_dir_path, json_files[0])
     
     # Load the trace file
     with open(trace_file_path, 'r') as f:
@@ -282,10 +317,17 @@ def test_exclude_vital_columns():
     are not present in the exported trace data or redacted with <REDACTED TEXT>.
     """
     # Load the trace file
-    trace_file_path = os.path.join(
+    trace_dir_path = os.path.join(
         Path(__file__).resolve().parent, 
-        "rag_agent_traces.json"
+        "rag_agent_traces"
     )
+    
+    # Get the JSON files in the directory
+    json_files = [f for f in os.listdir(trace_dir_path) if f.endswith('.json')]
+    assert json_files, f"No JSON files found in trace directory: {trace_dir_path}"
+    
+    # Use the first JSON file
+    trace_file_path = os.path.join(trace_dir_path, json_files[0])
     
     # Load the trace file
     with open(trace_file_path, 'r') as f:
@@ -332,10 +374,17 @@ def test_span_kind_not_null():
     This ensures that all spans have a properly defined kind value.
     """
     # Load the trace file
-    trace_file_path = os.path.join(
+    trace_dir_path = os.path.join(
         Path(__file__).resolve().parent, 
-        "rag_agent_traces.json"
+        "rag_agent_traces"
     )
+    
+    # Get the JSON files in the directory
+    json_files = [f for f in os.listdir(trace_dir_path) if f.endswith('.json')]
+    assert json_files, f"No JSON files found in trace directory: {trace_dir_path}"
+    
+    # Use the first JSON file
+    trace_file_path = os.path.join(trace_dir_path, json_files[0])
     
     # Load the trace file
     with open(trace_file_path, 'r') as f:
@@ -367,30 +416,40 @@ def setup_traces():
     """
     Session-level fixture to ensure traces are generated before running tests.
     """
-    trace_file_path = os.path.join(
+    trace_dir_path = os.path.join(
         Path(__file__).resolve().parent, 
-        "rag_agent_traces.json"
+        "rag_agent_traces"
     )
     
-    # Check if trace file exists, if not run the diagnosis agent
-    if not os.path.exists(trace_file_path):
-        print("Trace file does not exist, running scifi_writer.py to generate it")
-        success = run_diagnosis_agent()
-        
-        # Check again if trace file exists after attempting to run scifi_writer.py
-        if not os.path.exists(trace_file_path):
-            pytest.skip("Trace file could not be generated. Skipping tests instead of failing.")
+    # If directory exists but is empty, clean it
+    if os.path.exists(trace_dir_path):
+        if not os.listdir(trace_dir_path):
+            print("Trace directory exists but is empty")
+        else:
+            print(f"Using existing traces in {trace_dir_path}")
+            return
+    else:
+        # Create directory if it doesn't exist
+        os.makedirs(trace_dir_path, exist_ok=True)
+        print(f"Created trace directory: {trace_dir_path}")
+    
+    # Run the diagnosis agent to generate new traces
+    success = run_diagnosis_agent()
+    
+    # Check again if trace directory exists and has files after running the agent
+    if not os.path.exists(trace_dir_path) or not os.listdir(trace_dir_path):
+        pytest.skip("Trace files could not be generated. Skipping tests instead of failing.")
 
 if __name__ == "__main__":
     # First ensure we have trace data
     setup_traces()
     
-    trace_file_path = os.path.join(
+    trace_dir_path = os.path.join(
         Path(__file__).resolve().parent, 
-        "rag_agent_traces.json"
+        "rag_agent_traces"
     )
     
-    if os.path.exists(trace_file_path):
+    if os.path.exists(trace_dir_path) and os.listdir(trace_dir_path):
         # Then run all tests
         test_trace_total_cost()
         test_llm_cost_calculation()
@@ -400,5 +459,4 @@ if __name__ == "__main__":
         test_exclude_vital_columns()
         test_span_kind_not_null()
     else:
-        print("ERROR: Could not generate trace file. Tests cannot be run.")
-        
+        print("ERROR: Could not generate trace files. Tests cannot be run.")
