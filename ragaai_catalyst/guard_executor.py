@@ -176,6 +176,7 @@ class GuardExecutor:
                 doc['response'] = llm_response
         else:
             doc = self.set_variables(prompt,prompt_params)
+            doc['response'] = llm_response
         doc['traceId'] = trace_id
         deployment_response = self.execute_deployment(self.output_deployment_id,doc)
         del self.id_2_doc[trace_id]
