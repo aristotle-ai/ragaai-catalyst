@@ -49,10 +49,10 @@ class GuardExecutor:
         try:
             response = requests.request("POST", api, headers=headers, data=payload,timeout=self.guard_manager.timeout)
         except Exception as e:
-            logger.error('Failed running guardrail: ',str(e))
+            logger.error(f'Failed running guardrail: {str(e)}')
             return None
         if response.status_code!=200:
-            logger.error('Error in running deployment ',response.json()['message'])
+            logger.error(f'Error in running deployment {response.json()["message"]}')
         if response.json()['success']:
             return response.json()
         else:
@@ -185,3 +185,58 @@ class GuardExecutor:
         elif deployment_response:
             return None, deployment_response
 
+    @staticmethod
+    def execute_input_guardrail(input_deployment_id, prompt, context, gdm):
+        doc = {
+                'prompt':prompt,
+                'context':context
+               }
+        api = gdm.base_url + f'/guardrail/deployment/{input_deployment_id}/ingest'
+        payload = json.dumps(doc)
+        headers = {
+            'x-project-id': str(gdm.project_id),
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}'
+        }
+        try:
+            deployment_response = requests.request("POST", api, headers=headers, data=payload,timeout=gdm.timeout)
+        except Exception as e:
+            logger.error(f'Failed running guardrail: {str(e)}')
+            return None, None
+        
+        if deployment_response.status_code!=200:
+            logger.error(f'Error in input running deployment {deployment_response.json()["message"]}')
+            return None,None
+        if deployment_response.json()['success']:
+            return deployment_response.json()['data']['alternateResponse'], deployment_response.json()
+        else:
+            return None,None
+    
+    @staticmethod
+    def execute_output_guardrail(output_deployment_id, prompt, context, response, gdm, trace_id):
+        doc = {
+                'prompt':prompt,
+                'context':context,
+                'response':response,
+                'traceId':trace_id
+               }
+        api = gdm.base_url + f'/guardrail/deployment/{output_deployment_id}/ingest'
+        payload = json.dumps(doc)
+        headers = {
+            'x-project-id': str(gdm.project_id),
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}'
+        }
+        try:
+            deployment_response = requests.request("POST", api, headers=headers, data=payload,timeout=gdm.timeout)
+        except Exception as e:
+            logger.error(f'Failed running guardrail: {str(e)}')
+            return None, None
+        
+        if deployment_response.status_code!=200:
+            logger.error(f'Error in running output deployment {deployment_response.json()["message"]}')
+            return None,None
+        if deployment_response.json()['success']:
+            return deployment_response.json()['data']['alternateResponse'], deployment_response.json()
+        else:
+            return None,None
