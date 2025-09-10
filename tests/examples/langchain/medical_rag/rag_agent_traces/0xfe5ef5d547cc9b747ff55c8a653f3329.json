@@ -1,0 +1,875 @@
+{
+  "id": "0xfe5ef5d547cc9b747ff55c8a653f3329",
+  "trace_name": "",
+  "project_name": "langchain",
+  "start_time": "2025-09-10T11:00:09.611393+05:30",
+  "end_time": "2025-09-10T11:00:12.242275+05:30",
+  "external_id": null,
+  "metadata": {
+    "tokens": {
+      "prompt_tokens": 669.0,
+      "completion_tokens": 169.0,
+      "total_tokens": 838.0
+    },
+    "cost": {
+      "input_cost": 0.0010035,
+      "output_cost": 0.000338,
+      "total_cost": 0.0013415
+    },
+    "total_cost": 0.0013415,
+    "total_tokens": 838.0,
+    "system_info": {
+      "id": "sys_langchain",
+      "os": {
+        "name": "Darwin",
+        "version": "Darwin Kernel Version 21.6.0: Wed Aug 10 14:28:35 PDT 2022; root:xnu-8020.141.5~2/RELEASE_ARM64_T8101",
+        "platform": "arm64",
+        "kernel_version": "21.6.0"
+      },
+      "environment": {
+        "name": "Python",
+        "version": "3.12.11",
+        "packages": [
+          "ragaai-catalyst==2.2.5.6b2",
+          "deprecated==1.2.18",
+          "markupsafe==3.0.2",
+          "pyjwt==2.10.1",
+          "pyyaml==6.0.2",
+          "aiohappyeyeballs==2.6.1",
+          "aiohttp==3.12.15",
+          "aiosignal==1.4.0",
+          "aiosqlite==0.21.0",
+          "annotated-types==0.7.0",
+          "anthropic==0.66.0",
+          "anyio==4.10.0",
+          "appdirs==1.4.4",
+          "appnope==0.1.4",
+          "arxiv==2.2.0",
+          "asttokens==3.0.0",
+          "attrs==25.3.0",
+          "auth0-python==4.10.0",
+          "backoff==2.2.1",
+          "banks==2.2.0",
+          "bcrypt==4.3.0",
+          "beautifulsoup4==4.13.5",
+          "blinker==1.9.0",
+          "build==1.3.0",
+          "cachetools==5.5.2",
+          "certifi==2025.8.3",
+          "cffi==2.0.0",
+          "charset-normalizer==3.4.3",
+          "chromadb==1.0.20",
+          "click==8.2.1",
+          "colorama==0.4.6",
+          "coloredlogs==15.0.1",
+          "comm==0.2.3",
+          "construct==2.5.3",
+          "crewai==0.121.1",
+          "cryptography==45.0.7",
+          "dacite==1.9.2",
+          "dataclasses-json==0.6.7",
+          "debugpy==1.8.16",
+          "decorator==5.2.1",
+          "defusedxml==0.7.1",
+          "dirtyjson==1.0.8",
+          "diskcache==5.6.3",
+          "distro==1.9.0",
+          "docstring-parser==0.17.0",
+          "duckduckgo-search==8.1.1",
+          "durationpy==0.10",
+          "et-xmlfile==2.0.0",
+          "executing==2.2.1",
+          "fastuuid==0.12.0",
+          "feedparser==6.0.11",
+          "filelock==3.19.1",
+          "filetype==1.2.0",
+          "flatbuffers==25.2.10",
+          "frozenlist==1.7.0",
+          "fsspec==2025.9.0",
+          "google-ai-generativelanguage==0.6.18",
+          "google-api-core==2.25.1",
+          "google-auth==2.40.3",
+          "google-genai==1.35.0",
+          "googleapis-common-protos==1.70.0",
+          "gputil==1.4.0",
+          "greenlet==3.2.4",
+          "griffe==1.14.0",
+          "groq==0.31.1",
+          "grpcio==1.74.0",
+          "grpcio-status==1.74.0",
+          "h11==0.16.0",
+          "haystack==0.42",
+          "haystack-ai==2.17.1",
+          "haystack-experimental==0.13.0",
+          "hf-xet==1.1.9",
+          "httpcore==1.0.9",
+          "httptools==0.6.4",
+          "httpx==0.28.1",
+          "httpx-sse==0.4.1",
+          "huggingface-hub==0.34.4",
+          "humanfriendly==10.0",
+          "idna==3.10",
+          "importlib-metadata==8.7.0",
+          "importlib-resources==6.5.2",
+          "iniconfig==2.1.0",
+          "instructor==1.11.3",
+          "ipykernel==6.30.1",
+          "ipynbname==2025.8.0.0",
+          "ipython==9.5.0",
+          "ipython-pygments-lexers==1.1.1",
+          "jedi==0.19.2",
+          "jinja2==3.1.6",
+          "jiter==0.10.0",
+          "joblib==1.5.2",
+          "json5==0.12.1",
+          "json-repair==0.50.1",
+          "jsonpatch==1.33",
+          "jsonpickle==4.1.1",
+          "jsonpointer==3.0.0",
+          "jsonref==1.1.0",
+          "jsonschema==4.25.1",
+          "jsonschema-specifications==2025.9.1",
+          "jupyter-client==8.6.3",
+          "jupyter-core==5.8.1",
+          "kubernetes==33.1.0",
+          "langchain==0.3.27",
+          "langchain-anthropic==0.3.19",
+          "langchain-community==0.3.29",
+          "langchain-core==0.3.75",
+          "langchain-google-genai==2.1.10",
+          "langchain-openai==0.3.23",
+          "langchain-text-splitters==0.3.11",
+          "langgraph==0.6.7",
+          "langgraph-checkpoint==2.1.1",
+          "langgraph-prebuilt==0.6.4",
+          "langgraph-sdk==0.2.6",
+          "langsmith==0.4.27",
+          "lazy-imports==1.0.1",
+          "litellm==1.68.0",
+          "llama-cloud==0.1.35",
+          "llama-cloud-services==0.6.15",
+          "llama-index==0.12.38",
+          "llama-index-agent-openai==0.4.8",
+          "llama-index-cli==0.4.1",
+          "llama-index-core==0.12.52.post1",
+          "llama-index-embeddings-openai==0.3.1",
+          "llama-index-indices-managed-llama-cloud==0.8.0",
+          "llama-index-instrumentation==0.4.0",
+          "llama-index-llms-openai==0.3.42",
+          "llama-index-multi-modal-llms-openai==0.4.3",
+          "llama-index-program-openai==0.3.1",
+          "llama-index-question-gen-openai==0.3.0",
+          "llama-index-readers-file==0.4.11",
+          "llama-index-readers-llama-parse==0.4.0",
+          "llama-index-workflows==1.3.0",
+          "llama-parse==0.6.12",
+          "lxml==6.0.1",
+          "markdown==3.9",
+          "markdown-it-py==4.0.0",
+          "marshmallow==3.26.1",
+          "matplotlib-inline==0.1.7",
+          "mdurl==0.1.2",
+          "mmh3==5.2.0",
+          "more-itertools==10.8.0",
+          "mpmath==1.3.0",
+          "multidict==6.6.4",
+          "mypy-extensions==1.1.0",
+          "nest-asyncio==1.6.0",
+          "networkx==3.5",
+          "nltk==3.9.1",
+          "numpy==2.3.3",
+          "oauthlib==3.3.1",
+          "onnxruntime==1.19.2",
+          "openai==1.75.0",
+          "openinference-instrumentation==0.1.38",
+          "openinference-instrumentation-anthropic==0.1.19",
+          "openinference-instrumentation-bedrock==0.1.27",
+          "openinference-instrumentation-crewai==0.1.11",
+          "openinference-instrumentation-google-adk==0.1.4",
+          "openinference-instrumentation-groq==0.1.11",
+          "openinference-instrumentation-haystack==0.1.24",
+          "openinference-instrumentation-langchain==0.1.51",
+          "openinference-instrumentation-litellm==0.1.25",
+          "openinference-instrumentation-llama-index==4.3.4",
+          "openinference-instrumentation-mistralai==1.3.3",
+          "openinference-instrumentation-openai==0.1.32",
+          "openinference-instrumentation-openai-agents==1.3.0",
+          "openinference-instrumentation-smolagents==0.1.16",
+          "openinference-instrumentation-vertexai==0.1.11",
+          "openinference-semantic-conventions==0.1.21",
+          "openpyxl==3.1.5",
+          "opentelemetry-api==1.36.0",
+          "opentelemetry-exporter-otlp==1.36.0",
+          "opentelemetry-exporter-otlp-proto-common==1.36.0",
+          "opentelemetry-exporter-otlp-proto-grpc==1.36.0",
+          "opentelemetry-exporter-otlp-proto-http==1.36.0",
+          "opentelemetry-instrumentation==0.57b0",
+          "opentelemetry-proto==1.36.0",
+          "opentelemetry-sdk==1.36.0",
+          "opentelemetry-semantic-conventions==0.57b0",
+          "orjson==3.11.3",
+          "ormsgpack==1.10.0",
+          "overrides==7.7.0",
+          "packaging==25.0",
+          "pandas==2.2.3",
+          "parso==0.8.5",
+          "pdfminer-six==20250506",
+          "pdfplumber==0.11.7",
+          "pefile==2024.8.26",
+          "pexpect==4.9.0",
+          "pillow==11.3.0",
+          "pip==25.2",
+          "platformdirs==4.4.0",
+          "pluggy==1.6.0",
+          "posthog==5.4.0",
+          "primp==0.15.0",
+          "prompt-toolkit==3.0.52",
+          "propcache==0.3.2",
+          "proto-plus==1.26.1",
+          "protobuf==6.32.0",
+          "psutil==6.0.0",
+          "ptyprocess==0.7.0",
+          "pure-eval==0.2.3",
+          "py-cpuinfo==9.0.0",
+          "pyasn1==0.6.1",
+          "pyasn1-modules==0.4.2",
+          "pybase64==1.4.2",
+          "pycparser==2.23",
+          "pydantic==2.11.7",
+          "pydantic-core==2.33.2",
+          "pydantic-settings==2.10.1",
+          "pygments==2.19.2",
+          "pyopenssl==25.1.0",
+          "pypdf==5.9.0",
+          "pypdf2==3.0.1",
+          "pypdfium2==4.30.0",
+          "pypika==0.48.9",
+          "pyproject-hooks==1.2.0",
+          "pytest==8.4.2",
+          "python-dateutil==2.9.0.post0",
+          "python-dotenv==1.1.1",
+          "python-ptrace==0.9.9",
+          "pytz==2025.2",
+          "pyvis==0.3.2",
+          "pyzmq==27.1.0",
+          "referencing==0.36.2",
+          "regex==2025.9.1",
+          "requests==2.32.5",
+          "requests-oauthlib==2.0.0",
+          "requests-toolbelt==1.0.0",
+          "rich==14.1.0",
+          "rpds-py==0.27.1",
+          "rsa==4.9.1",
+          "safetensors==0.6.2",
+          "scikit-learn==1.7.2",
+          "scipy==1.16.1",
+          "sentence-transformers==5.1.0",
+          "setuptools==80.9.0",
+          "sgmllib3k==1.0.0",
+          "shellingham==1.5.4",
+          "six==1.17.0",
+          "smolagents==1.21.3",
+          "sniffio==1.3.1",
+          "soupsieve==2.8",
+          "sqlalchemy==2.0.43",
+          "stack-data==0.6.3",
+          "striprtf==0.0.26",
+          "sympy==1.14.0",
+          "tenacity==8.3.0",
+          "threadpoolctl==3.6.0",
+          "tiktoken==0.11.0",
+          "tokenizers==0.22.0",
+          "tomli==2.2.1",
+          "tomli-w==1.2.0",
+          "torch==2.8.0",
+          "tornado==6.5.2",
+          "tqdm==4.67.1",
+          "traitlets==5.14.3",
+          "transformers==4.56.1",
+          "typer==0.17.4",
+          "typing-extensions==4.15.0",
+          "typing-inspect==0.9.0",
+          "typing-inspection==0.4.1",
+          "tzdata==2025.2",
+          "urllib3==2.5.0",
+          "uv==0.8.16",
+          "uvicorn==0.35.0",
+          "uvloop==0.21.0",
+          "watchfiles==1.1.0",
+          "wcwidth==0.2.13",
+          "websocket-client==1.8.0",
+          "websockets==15.0.1",
+          "wheel==0.45.1",
+          "wrapt==1.17.3",
+          "xxhash==3.5.0",
+          "yarl==1.20.1",
+          "zipp==3.23.0",
+          "zstandard==0.24.0",
+          "autocommand==2.2.2",
+          "backports.tarfile==1.2.0",
+          "inflect==7.3.1",
+          "jaraco.collections==5.1.0",
+          "jaraco.context==5.3.0",
+          "jaraco.functools==4.0.1",
+          "jaraco.text==3.12.1",
+          "typeguard==4.3.0"
+        ],
+        "env_path": "/opt/homebrew/Caskroom/miniconda/base/envs/up_raga",
+        "command_to_run": "python diagnosis_agent.py"
+      },
+      "source_code": "7e79c7caeb8f46ea5d74b225187b1f6bba883c87e1c1b7927c60c2f91b2448dc"
+    },
+    "resources": {
+      "cpu": {
+        "info": {
+          "name": "arm",
+          "cores": 8,
+          "threads": 8
+        },
+        "interval": "5s",
+        "values": [
+          22.6
+        ]
+      },
+      "memory": {
+        "info": {
+          "total": 8.0,
+          "free": 1.5335235595703125
+        },
+        "interval": "5s",
+        "values": [
+          80.8
+        ]
+      },
+      "disk": {
+        "info": {
+          "total": 228.27386474609375,
+          "free": 0.6686325073242188
+        },
+        "interval": "5s",
+        "read": [
+          262899.37109375
+        ],
+        "write": [
+          70021.40234375
+        ]
+      },
+      "network": {
+        "info": {
+          "upload_speed": 931.7880859375,
+          "download_speed": 2713.7841796875
+        },
+        "interval": "5s",
+        "uploads": [
+          931.7880859375
+        ],
+        "downloads": [
+          2713.7841796875
+        ]
+      }
+    }
+  },
+  "replays": {
+    "source": null
+  },
+  "data": [
+    {
+      "spans": [
+        {
+          "name": "RunnableLambda.0",
+          "context": {
+            "trace_id": "0xfe5ef5d547cc9b747ff55c8a653f3329",
+            "span_id": "0x32958369af568fa7",
+            "trace_state": "[]"
+          },
+          "kind": "SpanKind.INTERNAL",
+          "parent_id": "0x888896a51a8c4db4",
+          "start_time": "2025-09-10T05:30:09.613117Z",
+          "end_time": "2025-09-10T05:30:09.613346Z",
+          "status": {
+            "status_code": "OK"
+          },
+          "attributes": {
+            "input.value": "Find the likely diagnosis, key evidence, and recommended next steps.",
+            "output.value": "dengue",
+            "openinference.span.kind": "CHAIN"
+          },
+          "events": [],
+          "links": [],
+          "resource": {
+            "attributes": {
+              "telemetry.sdk.language": "python",
+              "telemetry.sdk.name": "opentelemetry",
+              "telemetry.sdk.version": "1.36.0",
+              "service.name": "unknown_service"
+            },
+            "schema_url": ""
+          },
+          "name_occurrences": 0,
+          "hash_id": "8858afa8-1ef8-5064-a43c-03e893a71c4b"
+        },
+        {
+          "name": "RunnableLambda.1",
+          "context": {
+            "trace_id": "0xfe5ef5d547cc9b747ff55c8a653f3329",
+            "span_id": "0x55d39800a96942e7",
+            "trace_state": "[]"
+          },
+          "kind": "SpanKind.INTERNAL",
+          "parent_id": "0x888896a51a8c4db4",
+          "start_time": "2025-09-10T05:30:09.614090Z",
+          "end_time": "2025-09-10T05:30:09.614256Z",
+          "status": {
+            "status_code": "OK"
+          },
+          "attributes": {
+            "input.value": "Find the likely diagnosis, key evidence, and recommended next steps.",
+            "output.value": "70 years old female, no prior medical history",
+            "openinference.span.kind": "CHAIN"
+          },
+          "events": [],
+          "links": [],
+          "resource": {
+            "attributes": {
+              "telemetry.sdk.language": "python",
+              "telemetry.sdk.name": "opentelemetry",
+              "telemetry.sdk.version": "1.36.0",
+              "service.name": "unknown_service"
+            },
+            "schema_url": ""
+          },
+          "name_occurrences": 1,
+          "hash_id": "ca0b4b0d-60f9-56f3-9732-641fb334555b"
+        },
+        {
+          "name": "RunnableLambda.2",
+          "context": {
+            "trace_id": "0xfe5ef5d547cc9b747ff55c8a653f3329",
+            "span_id": "0xa81e313b71e623d0",
+            "trace_state": "[]"
+          },
+          "kind": "SpanKind.INTERNAL",
+          "parent_id": "0x888896a51a8c4db4",
+          "start_time": "2025-09-10T05:30:09.614019Z",
+          "end_time": "2025-09-10T05:30:09.614548Z",
+          "status": {
+            "status_code": "OK"
+          },
+          "attributes": {
+            "input.value": "Find the likely diagnosis, key evidence, and recommended next steps.",
+            "output.value": "fever, headache, fatigue",
+            "openinference.span.kind": "CHAIN"
+          },
+          "events": [],
+          "links": [],
+          "resource": {
+            "attributes": {
+              "telemetry.sdk.language": "python",
+              "telemetry.sdk.name": "opentelemetry",
+              "telemetry.sdk.version": "1.36.0",
+              "service.name": "unknown_service"
+            },
+            "schema_url": ""
+          },
+          "name_occurrences": 2,
+          "hash_id": "3f669580-8316-5eaf-8a57-7c3e9a4a8876"
+        },
+        {
+          "name": "VectorStoreRetriever.0",
+          "context": {
+            "trace_id": "0xfe5ef5d547cc9b747ff55c8a653f3329",
+            "span_id": "0x6f7456c804dc23f0",
+            "trace_state": "[]"
+          },
+          "kind": "SpanKind.INTERNAL",
+          "parent_id": "0x888896a51a8c4db4",
+          "start_time": "2025-09-10T05:30:09.612232Z",
+          "end_time": "2025-09-10T05:30:09.625841Z",
+          "status": {
+            "status_code": "OK"
+          },
+          "attributes": {
+            "input.value": "Find the likely diagnosis, key evidence, and recommended next steps.",
+            "output.value": "{\"documents\": [{\"id\": null, \"metadata\": {}, \"page_content\": \"Common Conditions Handbook\\nInfluenza (Flu):\\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\\n- Incubation period: 1-4 days\\n- Recommended testing: Rapid antigen test\\n- High-risk groups: Elderly, pregnant women\\nGERD (Acid Reflux):\\n- Primary symptoms: Heartburn, regurgitation, chest pain\\n- Diagnostic criteria: Symptom frequency >2x/week\\n- First-line treatment: Proton pump inhibitors\\n\\nCommon Conditions Handbook\\nMigraine:\\n- Key symptoms: Severe headache, nausea, sensitivity to light and sound\\n- Incubation period: N/A\\n- Recommended testing: N/A\\n- High-risk groups: N/A\\nPneumonia:\\n- Primary symptoms: Cough, fever, difficulty breathing\\n- Diagnostic criteria: Chest X-ray, sputum culture\\n- First-line treatment: Antibiotics\", \"type\": \"Document\"}, {\"id\": null, \"metadata\": {}, \"page_content\": \"Common Conditions Handbook\\nInfluenza (Flu):\\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\\n- Incubation period: 1-4 days\\n- Recommended testing: Rapid antigen test\\n- High-risk groups: Elderly, pregnant women\\nGERD (Acid Reflux):\\n- Primary symptoms: Heartburn, regurgitation, chest pain\\n- Diagnostic criteria: Symptom frequency >2x/week\\n- First-line treatment: Proton pump inhibitors\\n\\nCommon Conditions Handbook\\nMigraine:\\n- Key symptoms: Severe headache, nausea, sensitivity to light and sound\\n- Incubation period: N/A\\n- Recommended testing: N/A\\n- High-risk groups: N/A\\nPneumonia:\\n- Primary symptoms: Cough, fever, difficulty breathing\\n- Diagnostic criteria: Chest X-ray, sputum culture\\n- First-line treatment: Antibiotics\", \"type\": \"Document\"}, {\"id\": null, \"metadata\": {}, \"page_content\": \"Common Conditions Handbook\\nInfluenza (Flu):\\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\\n- Incubation period: 1-4 days\\n- Recommended testing: Rapid antigen test\\n- High-risk groups: Elderly, pregnant women\\nGERD (Acid Reflux):\\n- Primary symptoms: Heartburn, regurgitation, chest pain\\n- Diagnostic criteria: Symptom frequency >2x/week\\n- First-line treatment: Proton pump inhibitors\\n\\nCommon Conditions Handbook\\nMigraine:\\n- Key symptoms: Severe headache, nausea, sensitivity to light and sound\\n- Incubation period: N/A\\n- Recommended testing: N/A\\n- High-risk groups: N/A\\nPneumonia:\\n- Primary symptoms: Cough, fever, difficulty breathing\\n- Diagnostic criteria: Chest X-ray, sputum culture\\n- First-line treatment: Antibiotics\", \"type\": \"Document\"}]}",
+            "output.mime_type": "application/json",
+            "retrieval.documents.0.document.content": "Common Conditions Handbook\nInfluenza (Flu):\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\n- Incubation period: 1-4 days\n- Recommended testing: Rapid antigen test\n- High-risk groups: Elderly, pregnant women\nGERD (Acid Reflux):\n- Primary symptoms: Heartburn, regurgitation, chest pain\n- Diagnostic criteria: Symptom frequency >2x/week\n- First-line treatment: Proton pump inhibitors\n\nCommon Conditions Handbook\nMigraine:\n- Key symptoms: Severe headache, nausea, sensitivity to light and sound\n- Incubation period: N/A\n- Recommended testing: N/A\n- High-risk groups: N/A\nPneumonia:\n- Primary symptoms: Cough, fever, difficulty breathing\n- Diagnostic criteria: Chest X-ray, sputum culture\n- First-line treatment: Antibiotics",
+            "retrieval.documents.1.document.content": "Common Conditions Handbook\nInfluenza (Flu):\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\n- Incubation period: 1-4 days\n- Recommended testing: Rapid antigen test\n- High-risk groups: Elderly, pregnant women\nGERD (Acid Reflux):\n- Primary symptoms: Heartburn, regurgitation, chest pain\n- Diagnostic criteria: Symptom frequency >2x/week\n- First-line treatment: Proton pump inhibitors\n\nCommon Conditions Handbook\nMigraine:\n- Key symptoms: Severe headache, nausea, sensitivity to light and sound\n- Incubation period: N/A\n- Recommended testing: N/A\n- High-risk groups: N/A\nPneumonia:\n- Primary symptoms: Cough, fever, difficulty breathing\n- Diagnostic criteria: Chest X-ray, sputum culture\n- First-line treatment: Antibiotics",
+            "retrieval.documents.2.document.content": "Common Conditions Handbook\nInfluenza (Flu):\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\n- Incubation period: 1-4 days\n- Recommended testing: Rapid antigen test\n- High-risk groups: Elderly, pregnant women\nGERD (Acid Reflux):\n- Primary symptoms: Heartburn, regurgitation, chest pain\n- Diagnostic criteria: Symptom frequency >2x/week\n- First-line treatment: Proton pump inhibitors\n\nCommon Conditions Handbook\nMigraine:\n- Key symptoms: Severe headache, nausea, sensitivity to light and sound\n- Incubation period: N/A\n- Recommended testing: N/A\n- High-risk groups: N/A\nPneumonia:\n- Primary symptoms: Cough, fever, difficulty breathing\n- Diagnostic criteria: Chest X-ray, sputum culture\n- First-line treatment: Antibiotics",
+            "metadata": "{\"ls_retriever_name\": \"vectorstore\", \"ls_vector_store_provider\": \"Chroma\", \"ls_embedding_provider\": \"HuggingFaceEmbeddings\"}",
+            "openinference.span.kind": "RETRIEVER"
+          },
+          "events": [],
+          "links": [],
+          "resource": {
+            "attributes": {
+              "telemetry.sdk.language": "python",
+              "telemetry.sdk.name": "opentelemetry",
+              "telemetry.sdk.version": "1.36.0",
+              "service.name": "unknown_service"
+            },
+            "schema_url": ""
+          },
+          "name_occurrences": 0,
+          "hash_id": "6989c0b8-3879-5e34-80c7-823bac67ae3e"
+        },
+        {
+          "name": "RunnableParallel<context,disease,history,symptoms>.0",
+          "context": {
+            "trace_id": "0xfe5ef5d547cc9b747ff55c8a653f3329",
+            "span_id": "0x888896a51a8c4db4",
+            "trace_state": "[]"
+          },
+          "kind": "SpanKind.INTERNAL",
+          "parent_id": "0xca5b18108074dd3a",
+          "start_time": "2025-09-10T05:30:09.611894Z",
+          "end_time": "2025-09-10T05:30:09.626442Z",
+          "status": {
+            "status_code": "OK"
+          },
+          "attributes": {
+            "input.value": "Find the likely diagnosis, key evidence, and recommended next steps.",
+            "output.value": "{\"context\": [{\"id\": null, \"metadata\": {}, \"page_content\": \"Common Conditions Handbook\\nInfluenza (Flu):\\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\\n- Incubation period: 1-4 days\\n- Recommended testing: Rapid antigen test\\n- High-risk groups: Elderly, pregnant women\\nGERD (Acid Reflux):\\n- Primary symptoms: Heartburn, regurgitation, chest pain\\n- Diagnostic criteria: Symptom frequency >2x/week\\n- First-line treatment: Proton pump inhibitors\\n\\nCommon Conditions Handbook\\nMigraine:\\n- Key symptoms: Severe headache, nausea, sensitivity to light and sound\\n- Incubation period: N/A\\n- Recommended testing: N/A\\n- High-risk groups: N/A\\nPneumonia:\\n- Primary symptoms: Cough, fever, difficulty breathing\\n- Diagnostic criteria: Chest X-ray, sputum culture\\n- First-line treatment: Antibiotics\", \"type\": \"Document\"}, {\"id\": null, \"metadata\": {}, \"page_content\": \"Common Conditions Handbook\\nInfluenza (Flu):\\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\\n- Incubation period: 1-4 days\\n- Recommended testing: Rapid antigen test\\n- High-risk groups: Elderly, pregnant women\\nGERD (Acid Reflux):\\n- Primary symptoms: Heartburn, regurgitation, chest pain\\n- Diagnostic criteria: Symptom frequency >2x/week\\n- First-line treatment: Proton pump inhibitors\\n\\nCommon Conditions Handbook\\nMigraine:\\n- Key symptoms: Severe headache, nausea, sensitivity to light and sound\\n- Incubation period: N/A\\n- Recommended testing: N/A\\n- High-risk groups: N/A\\nPneumonia:\\n- Primary symptoms: Cough, fever, difficulty breathing\\n- Diagnostic criteria: Chest X-ray, sputum culture\\n- First-line treatment: Antibiotics\", \"type\": \"Document\"}, {\"id\": null, \"metadata\": {}, \"page_content\": \"Common Conditions Handbook\\nInfluenza (Flu):\\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\\n- Incubation period: 1-4 days\\n- Recommended testing: Rapid antigen test\\n- High-risk groups: Elderly, pregnant women\\nGERD (Acid Reflux):\\n- Primary symptoms: Heartburn, regurgitation, chest pain\\n- Diagnostic criteria: Symptom frequency >2x/week\\n- First-line treatment: Proton pump inhibitors\\n\\nCommon Conditions Handbook\\nMigraine:\\n- Key symptoms: Severe headache, nausea, sensitivity to light and sound\\n- Incubation period: N/A\\n- Recommended testing: N/A\\n- High-risk groups: N/A\\nPneumonia:\\n- Primary symptoms: Cough, fever, difficulty breathing\\n- Diagnostic criteria: Chest X-ray, sputum culture\\n- First-line treatment: Antibiotics\", \"type\": \"Document\"}], \"disease\": \"dengue\", \"history\": \"70 years old female, no prior medical history\", \"symptoms\": \"fever, headache, fatigue\"}",
+            "output.mime_type": "application/json",
+            "openinference.span.kind": "CHAIN"
+          },
+          "events": [],
+          "links": [],
+          "resource": {
+            "attributes": {
+              "telemetry.sdk.language": "python",
+              "telemetry.sdk.name": "opentelemetry",
+              "telemetry.sdk.version": "1.36.0",
+              "service.name": "unknown_service"
+            },
+            "schema_url": ""
+          },
+          "name_occurrences": 0,
+          "hash_id": "ddbad746-6261-547e-8eaf-85ef8dc0530b"
+        },
+        {
+          "name": "PromptTemplate.0",
+          "context": {
+            "trace_id": "0xfe5ef5d547cc9b747ff55c8a653f3329",
+            "span_id": "0xeb265a07a34e61ea",
+            "trace_state": "[]"
+          },
+          "kind": "SpanKind.INTERNAL",
+          "parent_id": "0xca5b18108074dd3a",
+          "start_time": "2025-09-10T05:30:09.626846Z",
+          "end_time": "2025-09-10T05:30:09.627096Z",
+          "status": {
+            "status_code": "OK"
+          },
+          "attributes": {
+            "input.value": "{\"context\": [{\"id\": null, \"metadata\": {}, \"page_content\": \"Common Conditions Handbook\\nInfluenza (Flu):\\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\\n- Incubation period: 1-4 days\\n- Recommended testing: Rapid antigen test\\n- High-risk groups: Elderly, pregnant women\\nGERD (Acid Reflux):\\n- Primary symptoms: Heartburn, regurgitation, chest pain\\n- Diagnostic criteria: Symptom frequency >2x/week\\n- First-line treatment: Proton pump inhibitors\\n\\nCommon Conditions Handbook\\nMigraine:\\n- Key symptoms: Severe headache, nausea, sensitivity to light and sound\\n- Incubation period: N/A\\n- Recommended testing: N/A\\n- High-risk groups: N/A\\nPneumonia:\\n- Primary symptoms: Cough, fever, difficulty breathing\\n- Diagnostic criteria: Chest X-ray, sputum culture\\n- First-line treatment: Antibiotics\", \"type\": \"Document\"}, {\"id\": null, \"metadata\": {}, \"page_content\": \"Common Conditions Handbook\\nInfluenza (Flu):\\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\\n- Incubation period: 1-4 days\\n- Recommended testing: Rapid antigen test\\n- High-risk groups: Elderly, pregnant women\\nGERD (Acid Reflux):\\n- Primary symptoms: Heartburn, regurgitation, chest pain\\n- Diagnostic criteria: Symptom frequency >2x/week\\n- First-line treatment: Proton pump inhibitors\\n\\nCommon Conditions Handbook\\nMigraine:\\n- Key symptoms: Severe headache, nausea, sensitivity to light and sound\\n- Incubation period: N/A\\n- Recommended testing: N/A\\n- High-risk groups: N/A\\nPneumonia:\\n- Primary symptoms: Cough, fever, difficulty breathing\\n- Diagnostic criteria: Chest X-ray, sputum culture\\n- First-line treatment: Antibiotics\", \"type\": \"Document\"}, {\"id\": null, \"metadata\": {}, \"page_content\": \"Common Conditions Handbook\\nInfluenza (Flu):\\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\\n- Incubation period: 1-4 days\\n- Recommended testing: Rapid antigen test\\n- High-risk groups: Elderly, pregnant women\\nGERD (Acid Reflux):\\n- Primary symptoms: Heartburn, regurgitation, chest pain\\n- Diagnostic criteria: Symptom frequency >2x/week\\n- First-line treatment: Proton pump inhibitors\\n\\nCommon Conditions Handbook\\nMigraine:\\n- Key symptoms: Severe headache, nausea, sensitivity to light and sound\\n- Incubation period: N/A\\n- Recommended testing: N/A\\n- High-risk groups: N/A\\nPneumonia:\\n- Primary symptoms: Cough, fever, difficulty breathing\\n- Diagnostic criteria: Chest X-ray, sputum culture\\n- First-line treatment: Antibiotics\", \"type\": \"Document\"}], \"disease\": \"dengue\", \"history\": \"70 years old female, no prior medical history\", \"symptoms\": \"fever, headache, fatigue\"}",
+            "input.mime_type": "application/json",
+            "output.value": "{\"text\": \"Use these medical guidelines to explain dengue:\\n        [Document(metadata={}, page_content='Common Conditions Handbook\\\\nInfluenza (Flu):\\\\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\\\\n- Incubation period: 1-4 days\\\\n- Recommended testing: Rapid antigen test\\\\n- High-risk groups: Elderly, pregnant women\\\\nGERD (Acid Reflux):\\\\n- Primary symptoms: Heartburn, regurgitation, chest pain\\\\n- Diagnostic criteria: Symptom frequency >2x/week\\\\n- First-line treatment: Proton pump inhibitors\\\\n\\\\nCommon Conditions Handbook\\\\nMigraine:\\\\n- Key symptoms: Severe headache, nausea, sensitivity to light and sound\\\\n- Incubation period: N/A\\\\n- Recommended testing: N/A\\\\n- High-risk groups: N/A\\\\nPneumonia:\\\\n- Primary symptoms: Cough, fever, difficulty breathing\\\\n- Diagnostic criteria: Chest X-ray, sputum culture\\\\n- First-line treatment: Antibiotics'), Document(metadata={}, page_content='Common Conditions Handbook\\\\nInfluenza (Flu):\\\\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\\\\n- Incubation period: 1-4 days\\\\n- Recommended testing: Rapid antigen test\\\\n- High-risk groups: Elderly, pregnant women\\\\nGERD (Acid Reflux):\\\\n- Primary symptoms: Heartburn, regurgitation, chest pain\\\\n- Diagnostic criteria: Symptom frequency >2x/week\\\\n- First-line treatment: Proton pump inhibitors\\\\n\\\\nCommon Conditions Handbook\\\\nMigraine:\\\\n- Key symptoms: Severe headache, nausea, sensitivity to light and sound\\\\n- Incubation period: N/A\\\\n- Recommended testing: N/A\\\\n- High-risk groups: N/A\\\\nPneumonia:\\\\n- Primary symptoms: Cough, fever, difficulty breathing\\\\n- Diagnostic criteria: Chest X-ray, sputum culture\\\\n- First-line treatment: Antibiotics'), Document(metadata={}, page_content='Common Conditions Handbook\\\\nInfluenza (Flu):\\\\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\\\\n- Incubation period: 1-4 days\\\\n- Recommended testing: Rapid antigen test\\\\n- High-risk groups: Elderly, pregnant women\\\\nGERD (Acid Reflux):\\\\n- Primary symptoms: Heartburn, regurgitation, chest pain\\\\n- Diagnostic criteria: Symptom frequency >2x/week\\\\n- First-line treatment: Proton pump inhibitors\\\\n\\\\nCommon Conditions Handbook\\\\nMigraine:\\\\n- Key symptoms: Severe headache, nausea, sensitivity to light and sound\\\\n- Incubation period: N/A\\\\n- Recommended testing: N/A\\\\n- High-risk groups: N/A\\\\nPneumonia:\\\\n- Primary symptoms: Cough, fever, difficulty breathing\\\\n- Diagnostic criteria: Chest X-ray, sputum culture\\\\n- First-line treatment: Antibiotics')]\\n        \\n        Patient History: 70 years old female, no prior medical history\\n        Symptoms: fever, headache, fatigue\\n        \\n        Provide:\\n        1. Likely diagnosis (confidence score)\\n        2. Key evidence from guidelines\\n        3. Recommended next steps\", \"type\": \"StringPromptValue\"}",
+            "output.mime_type": "application/json",
+            "llm.prompt_template.template": "Use these medical guidelines to explain {disease}:\n        {context}\n        \n        Patient History: {history}\n        Symptoms: {symptoms}\n        \n        Provide:\n        1. Likely diagnosis (confidence score)\n        2. Key evidence from guidelines\n        3. Recommended next steps",
+            "llm.prompt_template.variables": "{\"context\": [\"page_content='Common Conditions Handbook\\nInfluenza (Flu):\\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\\n- Incubation period: 1-4 days\\n- Recommended testing: Rapid antigen test\\n- High-risk groups: Elderly, pregnant women\\nGERD (Acid Reflux):\\n- Primary symptoms: Heartburn, regurgitation, chest pain\\n- Diagnostic criteria: Symptom frequency >2x/week\\n- First-line treatment: Proton pump inhibitors\\n\\nCommon Conditions Handbook\\nMigraine:\\n- Key symptoms: Severe headache, nausea, sensitivity to light and sound\\n- Incubation period: N/A\\n- Recommended testing: N/A\\n- High-risk groups: N/A\\nPneumonia:\\n- Primary symptoms: Cough, fever, difficulty breathing\\n- Diagnostic criteria: Chest X-ray, sputum culture\\n- First-line treatment: Antibiotics'\", \"page_content='Common Conditions Handbook\\nInfluenza (Flu):\\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\\n- Incubation period: 1-4 days\\n- Recommended testing: Rapid antigen test\\n- High-risk groups: Elderly, pregnant women\\nGERD (Acid Reflux):\\n- Primary symptoms: Heartburn, regurgitation, chest pain\\n- Diagnostic criteria: Symptom frequency >2x/week\\n- First-line treatment: Proton pump inhibitors\\n\\nCommon Conditions Handbook\\nMigraine:\\n- Key symptoms: Severe headache, nausea, sensitivity to light and sound\\n- Incubation period: N/A\\n- Recommended testing: N/A\\n- High-risk groups: N/A\\nPneumonia:\\n- Primary symptoms: Cough, fever, difficulty breathing\\n- Diagnostic criteria: Chest X-ray, sputum culture\\n- First-line treatment: Antibiotics'\", \"page_content='Common Conditions Handbook\\nInfluenza (Flu):\\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\\n- Incubation period: 1-4 days\\n- Recommended testing: Rapid antigen test\\n- High-risk groups: Elderly, pregnant women\\nGERD (Acid Reflux):\\n- Primary symptoms: Heartburn, regurgitation, chest pain\\n- Diagnostic criteria: Symptom frequency >2x/week\\n- First-line treatment: Proton pump inhibitors\\n\\nCommon Conditions Handbook\\nMigraine:\\n- Key symptoms: Severe headache, nausea, sensitivity to light and sound\\n- Incubation period: N/A\\n- Recommended testing: N/A\\n- High-risk groups: N/A\\nPneumonia:\\n- Primary symptoms: Cough, fever, difficulty breathing\\n- Diagnostic criteria: Chest X-ray, sputum culture\\n- First-line treatment: Antibiotics'\"], \"disease\": \"dengue\", \"history\": \"70 years old female, no prior medical history\", \"symptoms\": \"fever, headache, fatigue\"}",
+            "openinference.span.kind": "UNKNOWN"
+          },
+          "events": [],
+          "links": [],
+          "resource": {
+            "attributes": {
+              "telemetry.sdk.language": "python",
+              "telemetry.sdk.name": "opentelemetry",
+              "telemetry.sdk.version": "1.36.0",
+              "service.name": "unknown_service"
+            },
+            "schema_url": ""
+          },
+          "name_occurrences": 0,
+          "hash_id": "59a7e956-7d98-5f1d-85a2-aee9f2e9b11e"
+        },
+        {
+          "name": "OpenAI.0",
+          "context": {
+            "trace_id": "0xfe5ef5d547cc9b747ff55c8a653f3329",
+            "span_id": "0xa46f293e17faba32",
+            "trace_state": "[]"
+          },
+          "kind": "SpanKind.INTERNAL",
+          "parent_id": "0xca5b18108074dd3a",
+          "start_time": "2025-09-10T05:30:09.627650Z",
+          "end_time": "2025-09-10T05:30:12.238717Z",
+          "status": {
+            "status_code": "OK"
+          },
+          "attributes": {
+            "input.value": "{\"prompts\": [\"Use these medical guidelines to explain dengue:\\n        [Document(metadata={}, page_content='Common Conditions Handbook\\\\nInfluenza (Flu):\\\\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\\\\n- Incubation period: 1-4 days\\\\n- Recommended testing: Rapid antigen test\\\\n- High-risk groups: Elderly, pregnant women\\\\nGERD (Acid Reflux):\\\\n- Primary symptoms: Heartburn, regurgitation, chest pain\\\\n- Diagnostic criteria: Symptom frequency >2x/week\\\\n- First-line treatment: Proton pump inhibitors\\\\n\\\\nCommon Conditions Handbook\\\\nMigraine:\\\\n- Key symptoms: Severe headache, nausea, sensitivity to light and sound\\\\n- Incubation period: N/A\\\\n- Recommended testing: N/A\\\\n- High-risk groups: N/A\\\\nPneumonia:\\\\n- Primary symptoms: Cough, fever, difficulty breathing\\\\n- Diagnostic criteria: Chest X-ray, sputum culture\\\\n- First-line treatment: Antibiotics'), Document(metadata={}, page_content='Common Conditions Handbook\\\\nInfluenza (Flu):\\\\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\\\\n- Incubation period: 1-4 days\\\\n- Recommended testing: Rapid antigen test\\\\n- High-risk groups: Elderly, pregnant women\\\\nGERD (Acid Reflux):\\\\n- Primary symptoms: Heartburn, regurgitation, chest pain\\\\n- Diagnostic criteria: Symptom frequency >2x/week\\\\n- First-line treatment: Proton pump inhibitors\\\\n\\\\nCommon Conditions Handbook\\\\nMigraine:\\\\n- Key symptoms: Severe headache, nausea, sensitivity to light and sound\\\\n- Incubation period: N/A\\\\n- Recommended testing: N/A\\\\n- High-risk groups: N/A\\\\nPneumonia:\\\\n- Primary symptoms: Cough, fever, difficulty breathing\\\\n- Diagnostic criteria: Chest X-ray, sputum culture\\\\n- First-line treatment: Antibiotics'), Document(metadata={}, page_content='Common Conditions Handbook\\\\nInfluenza (Flu):\\\\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\\\\n- Incubation period: 1-4 days\\\\n- Recommended testing: Rapid antigen test\\\\n- High-risk groups: Elderly, pregnant women\\\\nGERD (Acid Reflux):\\\\n- Primary symptoms: Heartburn, regurgitation, chest pain\\\\n- Diagnostic criteria: Symptom frequency >2x/week\\\\n- First-line treatment: Proton pump inhibitors\\\\n\\\\nCommon Conditions Handbook\\\\nMigraine:\\\\n- Key symptoms: Severe headache, nausea, sensitivity to light and sound\\\\n- Incubation period: N/A\\\\n- Recommended testing: N/A\\\\n- High-risk groups: N/A\\\\nPneumonia:\\\\n- Primary symptoms: Cough, fever, difficulty breathing\\\\n- Diagnostic criteria: Chest X-ray, sputum culture\\\\n- First-line treatment: Antibiotics')]\\n        \\n        Patient History: 70 years old female, no prior medical history\\n        Symptoms: fever, headache, fatigue\\n        \\n        Provide:\\n        1. Likely diagnosis (confidence score)\\n        2. Key evidence from guidelines\\n        3. Recommended next steps\"]}",
+            "input.mime_type": "application/json",
+            "output.value": "{\"generations\": [[{\"text\": \"\\n\\n1. Likely diagnosis: Influenza (Flu) (confidence score: high)\\n2. Key evidence from guidelines:\\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\\n- Incubation period: 1-4 days\\n- Recommended testing: Rapid antigen test\\n- High-risk groups: Elderly, pregnant women\\n3. Recommended next steps:\\n- Conduct a rapid antigen test to confirm the diagnosis\\n- Monitor the patient's symptoms and provide supportive care, such as rest and hydration\\n- Consider prescribing antiviral medication, especially if the patient is at high risk for complications\\n- Advise the patient to stay home and avoid contact with others to prevent the spread of the virus\\n- Follow up with the patient in a few days to assess their progress and provide further treatment if necessary.\", \"generation_info\": {\"finish_reason\": \"stop\", \"logprobs\": null}, \"type\": \"Generation\"}]], \"llm_output\": {\"token_usage\": {\"total_tokens\": 838, \"prompt_tokens\": 669, \"completion_tokens\": 169}, \"model_name\": \"gpt-3.5-turbo-instruct\"}, \"run\": null, \"type\": \"LLMResult\"}",
+            "output.mime_type": "application/json",
+            "llm.prompts": [
+              "Use these medical guidelines to explain dengue:\n        [Document(metadata={}, page_content='Common Conditions Handbook\\nInfluenza (Flu):\\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\\n- Incubation period: 1-4 days\\n- Recommended testing: Rapid antigen test\\n- High-risk groups: Elderly, pregnant women\\nGERD (Acid Reflux):\\n- Primary symptoms: Heartburn, regurgitation, chest pain\\n- Diagnostic criteria: Symptom frequency >2x/week\\n- First-line treatment: Proton pump inhibitors\\n\\nCommon Conditions Handbook\\nMigraine:\\n- Key symptoms: Severe headache, nausea, sensitivity to light and sound\\n- Incubation period: N/A\\n- Recommended testing: N/A\\n- High-risk groups: N/A\\nPneumonia:\\n- Primary symptoms: Cough, fever, difficulty breathing\\n- Diagnostic criteria: Chest X-ray, sputum culture\\n- First-line treatment: Antibiotics'), Document(metadata={}, page_content='Common Conditions Handbook\\nInfluenza (Flu):\\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\\n- Incubation period: 1-4 days\\n- Recommended testing: Rapid antigen test\\n- High-risk groups: Elderly, pregnant women\\nGERD (Acid Reflux):\\n- Primary symptoms: Heartburn, regurgitation, chest pain\\n- Diagnostic criteria: Symptom frequency >2x/week\\n- First-line treatment: Proton pump inhibitors\\n\\nCommon Conditions Handbook\\nMigraine:\\n- Key symptoms: Severe headache, nausea, sensitivity to light and sound\\n- Incubation period: N/A\\n- Recommended testing: N/A\\n- High-risk groups: N/A\\nPneumonia:\\n- Primary symptoms: Cough, fever, difficulty breathing\\n- Diagnostic criteria: Chest X-ray, sputum culture\\n- First-line treatment: Antibiotics'), Document(metadata={}, page_content='Common Conditions Handbook\\nInfluenza (Flu):\\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\\n- Incubation period: 1-4 days\\n- Recommended testing: Rapid antigen test\\n- High-risk groups: Elderly, pregnant women\\nGERD (Acid Reflux):\\n- Primary symptoms: Heartburn, regurgitation, chest pain\\n- Diagnostic criteria: Symptom frequency >2x/week\\n- First-line treatment: Proton pump inhibitors\\n\\nCommon Conditions Handbook\\nMigraine:\\n- Key symptoms: Severe headache, nausea, sensitivity to light and sound\\n- Incubation period: N/A\\n- Recommended testing: N/A\\n- High-risk groups: N/A\\nPneumonia:\\n- Primary symptoms: Cough, fever, difficulty breathing\\n- Diagnostic criteria: Chest X-ray, sputum culture\\n- First-line treatment: Antibiotics')]\n        \n        Patient History: 70 years old female, no prior medical history\n        Symptoms: fever, headache, fatigue\n        \n        Provide:\n        1. Likely diagnosis (confidence score)\n        2. Key evidence from guidelines\n        3. Recommended next steps"
+            ],
+            "llm.invocation_parameters": "{\"model_name\": \"gpt-3.5-turbo-instruct\", \"temperature\": 0.3, \"top_p\": 1.0, \"frequency_penalty\": 0.0, \"presence_penalty\": 0.0, \"n\": 1, \"logit_bias\": {}, \"max_tokens\": 256, \"_type\": \"openai\", \"stop\": null}",
+            "llm.provider": "openai",
+            "llm.system": "openai",
+            "llm.model_name": "gpt-3.5-turbo-instruct",
+            "llm.token_count.prompt": 669,
+            "llm.token_count.completion": 169,
+            "llm.token_count.total": 838,
+            "metadata": "{\"ls_provider\": \"openai\", \"ls_model_type\": \"llm\", \"ls_model_name\": \"gpt-3.5-turbo-instruct\", \"ls_temperature\": 0.3, \"ls_max_tokens\": 256}",
+            "openinference.span.kind": "LLM",
+            "llm.cost": {
+              "input_cost": 0.0010035,
+              "output_cost": 0.000338,
+              "total_cost": 0.0013415
+            }
+          },
+          "events": [],
+          "links": [],
+          "resource": {
+            "attributes": {
+              "telemetry.sdk.language": "python",
+              "telemetry.sdk.name": "opentelemetry",
+              "telemetry.sdk.version": "1.36.0",
+              "service.name": "unknown_service"
+            },
+            "schema_url": ""
+          },
+          "name_occurrences": 0,
+          "hash_id": "78f3106c-0b46-53e0-9a1c-a0dd8c518e5c"
+        },
+        {
+          "name": "StrOutputParser.0",
+          "context": {
+            "trace_id": "0xfe5ef5d547cc9b747ff55c8a653f3329",
+            "span_id": "0x5de6ee3e410cc500",
+            "trace_state": "[]"
+          },
+          "kind": "SpanKind.INTERNAL",
+          "parent_id": "0xca5b18108074dd3a",
+          "start_time": "2025-09-10T05:30:12.241270Z",
+          "end_time": "2025-09-10T05:30:12.241959Z",
+          "status": {
+            "status_code": "OK"
+          },
+          "attributes": {
+            "input.value": "\n\n1. Likely diagnosis: Influenza (Flu) (confidence score: high)\n2. Key evidence from guidelines:\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\n- Incubation period: 1-4 days\n- Recommended testing: Rapid antigen test\n- High-risk groups: Elderly, pregnant women\n3. Recommended next steps:\n- Conduct a rapid antigen test to confirm the diagnosis\n- Monitor the patient's symptoms and provide supportive care, such as rest and hydration\n- Consider prescribing antiviral medication, especially if the patient is at high risk for complications\n- Advise the patient to stay home and avoid contact with others to prevent the spread of the virus\n- Follow up with the patient in a few days to assess their progress and provide further treatment if necessary.",
+            "output.value": "\n\n1. Likely diagnosis: Influenza (Flu) (confidence score: high)\n2. Key evidence from guidelines:\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\n- Incubation period: 1-4 days\n- Recommended testing: Rapid antigen test\n- High-risk groups: Elderly, pregnant women\n3. Recommended next steps:\n- Conduct a rapid antigen test to confirm the diagnosis\n- Monitor the patient's symptoms and provide supportive care, such as rest and hydration\n- Consider prescribing antiviral medication, especially if the patient is at high risk for complications\n- Advise the patient to stay home and avoid contact with others to prevent the spread of the virus\n- Follow up with the patient in a few days to assess their progress and provide further treatment if necessary.",
+            "openinference.span.kind": "UNKNOWN"
+          },
+          "events": [],
+          "links": [],
+          "resource": {
+            "attributes": {
+              "telemetry.sdk.language": "python",
+              "telemetry.sdk.name": "opentelemetry",
+              "telemetry.sdk.version": "1.36.0",
+              "service.name": "unknown_service"
+            },
+            "schema_url": ""
+          },
+          "name_occurrences": 0,
+          "hash_id": "ef6287ac-5c44-5ae0-8130-845ea8dd427e"
+        },
+        {
+          "name": "RunnableSequence.0",
+          "context": {
+            "trace_id": "0xfe5ef5d547cc9b747ff55c8a653f3329",
+            "span_id": "0xca5b18108074dd3a",
+            "trace_state": "[]"
+          },
+          "kind": "SpanKind.INTERNAL",
+          "parent_id": null,
+          "start_time": "2025-09-10T05:30:09.611393Z",
+          "end_time": "2025-09-10T05:30:12.242275Z",
+          "status": {
+            "status_code": "OK"
+          },
+          "attributes": {
+            "input.value": "Find the likely diagnosis, key evidence, and recommended next steps.",
+            "output.value": "\n\n1. Likely diagnosis: Influenza (Flu) (confidence score: high)\n2. Key evidence from guidelines:\n- Key symptoms: Fever >100\u00b0F, headache, muscle pain, fatigue\n- Incubation period: 1-4 days\n- Recommended testing: Rapid antigen test\n- High-risk groups: Elderly, pregnant women\n3. Recommended next steps:\n- Conduct a rapid antigen test to confirm the diagnosis\n- Monitor the patient's symptoms and provide supportive care, such as rest and hydration\n- Consider prescribing antiviral medication, especially if the patient is at high risk for complications\n- Advise the patient to stay home and avoid contact with others to prevent the spread of the virus\n- Follow up with the patient in a few days to assess their progress and provide further treatment if necessary.",
+            "openinference.span.kind": "CHAIN"
+          },
+          "events": [],
+          "links": [],
+          "resource": {
+            "attributes": {
+              "telemetry.sdk.language": "python",
+              "telemetry.sdk.name": "opentelemetry",
+              "telemetry.sdk.version": "1.36.0",
+              "service.name": "unknown_service"
+            },
+            "schema_url": ""
+          },
+          "name_occurrences": 0,
+          "hash_id": "e7dbff15-cbc5-5a58-b299-4405c90c4d38"
+        }
+      ],
+      "start_time": "2025-09-10T11:00:09.611393+05:30",
+      "end_time": "2025-09-10T11:00:12.242275+05:30"
+    }
+  ],
+  "network_calls": [],
+  "interactions": [],
+  "workflow": [
+    {
+      "id": "1",
+      "span_id": null,
+      "interaction_type": "None_call_start",
+      "name": "RunnableSequence.0",
+      "content": null,
+      "timestamp": "2025-09-10T05:30:09.611393Z",
+      "error": null
+    },
+    {
+      "id": "2",
+      "span_id": null,
+      "interaction_type": "None_call_start",
+      "name": "RunnableParallel<context,disease,history,symptoms>.0",
+      "content": null,
+      "timestamp": "2025-09-10T05:30:09.611894Z",
+      "error": null
+    },
+    {
+      "id": "3",
+      "span_id": null,
+      "interaction_type": "None_call_start",
+      "name": "VectorStoreRetriever.0",
+      "content": null,
+      "timestamp": "2025-09-10T05:30:09.612232Z",
+      "error": null
+    },
+    {
+      "id": "4",
+      "span_id": null,
+      "interaction_type": "None_call_start",
+      "name": "RunnableLambda.0",
+      "content": null,
+      "timestamp": "2025-09-10T05:30:09.613117Z",
+      "error": null
+    },
+    {
+      "id": "5",
+      "span_id": null,
+      "interaction_type": "None_call_end",
+      "name": "RunnableLambda.0",
+      "content": null,
+      "timestamp": "2025-09-10T05:30:09.613346Z",
+      "error": null
+    },
+    {
+      "id": "6",
+      "span_id": null,
+      "interaction_type": "None_call_start",
+      "name": "RunnableLambda.2",
+      "content": null,
+      "timestamp": "2025-09-10T05:30:09.614019Z",
+      "error": null
+    },
+    {
+      "id": "7",
+      "span_id": null,
+      "interaction_type": "None_call_start",
+      "name": "RunnableLambda.1",
+      "content": null,
+      "timestamp": "2025-09-10T05:30:09.614090Z",
+      "error": null
+    },
+    {
+      "id": "8",
+      "span_id": null,
+      "interaction_type": "None_call_end",
+      "name": "RunnableLambda.1",
+      "content": null,
+      "timestamp": "2025-09-10T05:30:09.614256Z",
+      "error": null
+    },
+    {
+      "id": "9",
+      "span_id": null,
+      "interaction_type": "None_call_end",
+      "name": "RunnableLambda.2",
+      "content": null,
+      "timestamp": "2025-09-10T05:30:09.614548Z",
+      "error": null
+    },
+    {
+      "id": "10",
+      "span_id": null,
+      "interaction_type": "None_call_end",
+      "name": "VectorStoreRetriever.0",
+      "content": null,
+      "timestamp": "2025-09-10T05:30:09.625841Z",
+      "error": null
+    },
+    {
+      "id": "11",
+      "span_id": null,
+      "interaction_type": "None_call_end",
+      "name": "RunnableParallel<context,disease,history,symptoms>.0",
+      "content": null,
+      "timestamp": "2025-09-10T05:30:09.626442Z",
+      "error": null
+    },
+    {
+      "id": "12",
+      "span_id": null,
+      "interaction_type": "None_call_start",
+      "name": "PromptTemplate.0",
+      "content": null,
+      "timestamp": "2025-09-10T05:30:09.626846Z",
+      "error": null
+    },
+    {
+      "id": "13",
+      "span_id": null,
+      "interaction_type": "None_call_end",
+      "name": "PromptTemplate.0",
+      "content": null,
+      "timestamp": "2025-09-10T05:30:09.627096Z",
+      "error": null
+    },
+    {
+      "id": "14",
+      "span_id": null,
+      "interaction_type": "None_call_start",
+      "name": "OpenAI.0",
+      "content": null,
+      "timestamp": "2025-09-10T05:30:09.627650Z",
+      "error": null
+    },
+    {
+      "id": "15",
+      "span_id": null,
+      "interaction_type": "None_call_end",
+      "name": "OpenAI.0",
+      "content": null,
+      "timestamp": "2025-09-10T05:30:12.238717Z",
+      "error": null
+    },
+    {
+      "id": "16",
+      "span_id": null,
+      "interaction_type": "None_call_start",
+      "name": "StrOutputParser.0",
+      "content": null,
+      "timestamp": "2025-09-10T05:30:12.241270Z",
+      "error": null
+    },
+    {
+      "id": "17",
+      "span_id": null,
+      "interaction_type": "None_call_end",
+      "name": "StrOutputParser.0",
+      "content": null,
+      "timestamp": "2025-09-10T05:30:12.241959Z",
+      "error": null
+    },
+    {
+      "id": "18",
+      "span_id": null,
+      "interaction_type": "None_call_end",
+      "name": "RunnableSequence.0",
+      "content": null,
+      "timestamp": "2025-09-10T05:30:12.242275Z",
+      "error": null
+    }
+  ],
+  "tracer_type": "agentic/langchain"
+}
