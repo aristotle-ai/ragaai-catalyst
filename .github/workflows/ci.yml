@@ -2,9 +2,9 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [ ci/cd_pipline_integration ]
   pull_request:
-    branches: [ main ]
+    branches: [ ci/cd_pipline_integration ]
 
 jobs:
   code-quality:
