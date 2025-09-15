@@ -97,7 +97,7 @@ jobs:
           cat test-output.txt | grep -E "collected|PASSED|FAILED|ERROR|SKIPPED" >> $GITHUB_OUTPUT
           echo '```' >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-#run-workflow          
+        
   regression-tests:
     needs: test
     runs-on: ubuntu-latest
