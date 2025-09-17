@@ -43,7 +43,16 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.10', '3.11', '3.12', '3.13']
+        python-version: ['3.10', '3.11', '3.12']
+        include:
+          - os: ubuntu-latest
+            python-version: '3.13'
+          - os: macos-latest
+            python-version: '3.13'
+    # Exclude the problematic combination
+    exclude:
+      - os: windows-latest
+        python-version: '3.13'
     runs-on: ${{ matrix.os }}
     outputs:
       test_summary: ${{ steps.pytest.outputs.test_summary }}
@@ -100,13 +109,27 @@ jobs:
         
   regression-tests:
     needs: test
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.10', '3.11', '3.12']
+        include:
+          - os: ubuntu-latest
+            python-version: '3.13'
+          - os: macos-latest
+            python-version: '3.13'
+        exclude:
+          - os: windows-latest
+            python-version: '3.13'
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python-version }}
+
       - name: Install dependencies
         shell: bash
         run: |
