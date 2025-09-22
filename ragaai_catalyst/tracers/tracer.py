@@ -28,24 +28,34 @@ from ragaai_catalyst.tracers.agentic_tracing.utils.file_name_tracker import Trac
 from opentelemetry import context
 from opentelemetry import trace as otel_trace
 from opentelemetry.sdk.trace import SpanProcessor as OtelSpanProcessor
+import contextvars
 
 logger = logging.getLogger(__name__)
+
+# Context-local external_id to avoid cross-thread/task leakage
+_RAGAAI_EXTERNAL_ID_CTX: contextvars.ContextVar = contextvars.ContextVar(
+    "ragaai_external_id_ctx",
+    default=None,
+)
 logging_level = (
     logger.setLevel(logging.DEBUG) if os.getenv("DEBUG") == "1" else logging.INFO
 )
 
 class _ExternalIdSpanProcessor(OtelSpanProcessor):
     """Span processor that stamps ragaai.external_id onto spans at start."""
-    def __init__(self, external_id_getter):
+    def __init__(self, external_id_getter=None):
+        # external_id_getter kept for backward compat, prefer contextvar
         self._external_id_getter = external_id_getter
 
     def on_start(self, span, parent_context):
         try:
-            external_id = None
-            try:
-                external_id = self._external_id_getter()
-            except Exception:
-                external_id = None
+            # Prefer context-local external_id
+            external_id = _RAGAAI_EXTERNAL_ID_CTX.get()
+            if external_id is None and self._external_id_getter is not None:
+                try:
+                    external_id = self._external_id_getter()
+                except Exception:
+                    external_id = None
             if external_id:
                 span.set_attribute("ragaai.external_id", str(external_id))
         except Exception:
@@ -510,6 +520,11 @@ class Tracer(AgenticTracing):
         Args:
             external_id (str): The new external_id to set
         """
+        # Set context-local external_id for concurrent safety
+        try:
+            _RAGAAI_EXTERNAL_ID_CTX.set(external_id)
+        except Exception:
+            pass
         # Tag current span to ensure per-trace correctness in concurrent scenarios
         try:
             span = otel_trace.get_current_span()
@@ -662,7 +677,7 @@ class Tracer(AgenticTracing):
         # Add processor to stamp external_id on all spans at start
         try:
             tracer_provider.add_span_processor(
-                _ExternalIdSpanProcessor(lambda: getattr(self.dynamic_exporter, "external_id", None))
+                _ExternalIdSpanProcessor()
             )
         except Exception as e:
             logger.debug(f"Failed to add ExternalId span processor: {e}")
