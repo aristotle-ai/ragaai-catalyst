@@ -25,11 +25,40 @@ from http.client import RemoteDisconnected
 from ragaai_catalyst.tracers.agentic_tracing import AgenticTracing
 from ragaai_catalyst.tracers.exporters.ragaai_trace_exporter import RAGATraceExporter
 from ragaai_catalyst.tracers.agentic_tracing.utils.file_name_tracker import TrackName
+from opentelemetry import context
+from opentelemetry import trace as otel_trace
+from opentelemetry.sdk.trace import SpanProcessor as OtelSpanProcessor
 
 logger = logging.getLogger(__name__)
 logging_level = (
     logger.setLevel(logging.DEBUG) if os.getenv("DEBUG") == "1" else logging.INFO
 )
+
+class _ExternalIdSpanProcessor(OtelSpanProcessor):
+    """Span processor that stamps ragaai.external_id onto spans at start."""
+    def __init__(self, external_id_getter):
+        self._external_id_getter = external_id_getter
+
+    def on_start(self, span, parent_context):
+        try:
+            external_id = None
+            try:
+                external_id = self._external_id_getter()
+            except Exception:
+                external_id = None
+            if external_id:
+                span.set_attribute("ragaai.external_id", str(external_id))
+        except Exception:
+            pass
+
+    def on_end(self, span):
+        return
+
+    def shutdown(self):
+        return True
+
+    def force_flush(self, timeout_millis: int = 30000):
+        return True
 
 class Tracer(AgenticTracing):
     NUM_PROJECTS = 99999
@@ -481,6 +510,13 @@ class Tracer(AgenticTracing):
         Args:
             external_id (str): The new external_id to set
         """
+        # Tag current span to ensure per-trace correctness in concurrent scenarios
+        try:
+            span = otel_trace.get_current_span()
+            if span is not None:
+                span.set_attribute("ragaai.external_id", str(external_id))
+        except Exception as e:
+            logger.debug(f"Unable to set span attribute ragaai.external_id: {e}")
         self.dynamic_exporter.external_id = external_id
         logger.debug(f"Updated dynamic exporter's external_id to {external_id}")
 
@@ -623,6 +659,13 @@ class Tracer(AgenticTracing):
         
         # Set up tracer provider
         tracer_provider = trace_sdk.TracerProvider()
+        # Add processor to stamp external_id on all spans at start
+        try:
+            tracer_provider.add_span_processor(
+                _ExternalIdSpanProcessor(lambda: getattr(self.dynamic_exporter, "external_id", None))
+            )
+        except Exception as e:
+            logger.debug(f"Failed to add ExternalId span processor: {e}")
         tracer_provider.add_span_processor(SimpleSpanProcessor(self.dynamic_exporter))
         
         # Instrument all specified instrumentors

@@ -68,6 +68,8 @@ class RAGATraceExporter(SpanExporter):
             user_gt: Optional[str] = None,
             external_id: Optional[str] = None
     ):
+        # Buffer spans by (external_id, trace_id) to ensure one external_id per processed trace
+        # Structure: { (external_id, trace_id): [span_json, ...] }
         self.trace_spans = dict()
         # Use custom trace directory if environment variable is set, otherwise use temp directory
         custom_dir = os.getenv("RAGAAI_TRACE_DIR")
@@ -109,22 +111,37 @@ class RAGATraceExporter(SpanExporter):
                 if trace_id is None:
                     logger.error("Trace ID is None")
 
-                if trace_id not in self.trace_spans:
-                    self.trace_spans[trace_id] = list()
+                # Determine external_id from span attributes (may be None)
+                external_id = None
+                try:
+                    external_id = span_json.get("attributes", {}).get("ragaai.external_id", None)
+                except Exception:
+                    external_id = None
+
+                # Compose composite key: (external_id, trace_id)
+                trace_key = (external_id, trace_id)
+
+                # Initialize buffer
+                if trace_key not in self.trace_spans:
+                    self.trace_spans[trace_key] = list()
 
                 if span_json.get("attributes").get("openinference.span.kind", None) is None:
                     span_json["attributes"]["openinference.span.kind"] = "UNKNOWN"
 
-                self.trace_spans[trace_id].append(span_json)
+                # Append to the external_id-specific group
+                self.trace_spans[trace_key].append(span_json)
 
+                # If root span arrives, process only the group for its external_id
                 if span_json["parent_id"] is None:
-                    trace = self.trace_spans[trace_id]
+                    trace_group = self.trace_spans.get(trace_key, [])
                     try:
-                        self.process_complete_trace(trace, trace_id)
+                        self.process_complete_trace(trace_group, trace_id, external_id)
                     except Exception as e:
                         logger.error(f"Error processing complete trace: {e}")
                     try:
-                        del self.trace_spans[trace_id]
+                        # Remove processed group
+                        if trace_key in self.trace_spans:
+                            del self.trace_spans[trace_key]
                     except Exception as e:
                         logger.error(f"Error deleting trace: {e}")
             except Exception as e:
@@ -136,14 +153,16 @@ class RAGATraceExporter(SpanExporter):
     def shutdown(self):
         # Process any remaining traces during shutdown
         logger.debug("Reached shutdown of exporter")
-        for trace_id, spans in self.trace_spans.items():
-            self.process_complete_trace(spans, trace_id)
+        for trace_key, spans in self.trace_spans.items():
+            # trace_key = (external_id, trace_id)
+            external_id, trace_id = trace_key
+            self.process_complete_trace(spans, trace_id, external_id)
         self.trace_spans.clear()
 
-    def process_complete_trace(self, spans, trace_id):
+    def process_complete_trace(self, spans, trace_id, external_id):
         # Convert the trace to ragaai trace format
         try:
-            ragaai_trace_details = self.prepare_trace(spans, trace_id)
+            ragaai_trace_details = self.prepare_trace(spans, trace_id, external_id)
         except Exception as e:
             print(f"Error converting trace {trace_id}: {e}")
             return  # Exit early if conversion fails
@@ -161,11 +180,18 @@ class RAGATraceExporter(SpanExporter):
         except Exception as e:
             print(f"Error uploading trace {trace_id}: {e}")
 
-    def prepare_trace(self, spans, trace_id):
+    def prepare_trace(self, spans, trace_id, external_id):
         try:
             try:
-                ragaai_trace = convert_json_format(spans, self.custom_model_cost, self.user_context, self.user_gt,
-                                                   self.external_id)
+                # Prefer the group's external_id when present
+                grouped_external_id = external_id if external_id is not None else self.external_id
+                ragaai_trace = convert_json_format(
+                    spans,
+                    self.custom_model_cost,
+                    self.user_context,
+                    self.user_gt,
+                    grouped_external_id,
+                )
             except Exception as e:
                 print(f"Error in convert_json_format function: {trace_id}: {e}")
                 return None
