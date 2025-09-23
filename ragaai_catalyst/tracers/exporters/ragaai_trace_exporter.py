@@ -163,9 +163,30 @@ class RAGATraceExporter(SpanExporter):
 
     def prepare_trace(self, spans, trace_id):
         try:
+            # Extract external_id from spans via OpenInference user.id (prefer root span)
+            external_id_from_spans = None
             try:
-                ragaai_trace = convert_json_format(spans, self.custom_model_cost, self.user_context, self.user_gt,
-                                                   self.external_id)
+                root_span = next((s for s in spans if s.get("parent_id") is None), None)
+                if root_span:
+                    external_id_from_spans = (
+                        root_span.get("attributes", {}).get("user.id")
+                    )
+                if not external_id_from_spans:
+                    for s in spans:
+                        external_id_from_spans = s.get("attributes", {}).get("user.id")
+                        if external_id_from_spans:
+                            break
+            except Exception:
+                external_id_from_spans = None
+
+            try:
+                ragaai_trace = convert_json_format(
+                    spans,
+                    self.custom_model_cost,
+                    self.user_context,
+                    self.user_gt,
+                    external_id_from_spans if external_id_from_spans else self.external_id,
+                )
             except Exception as e:
                 print(f"Error in convert_json_format function: {trace_id}: {e}")
                 return None
