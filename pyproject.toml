@@ -44,6 +44,7 @@ dependencies = [
     "tiktoken>=0.7.0",
     "tomli>=2.0.0",
     "rich>=13.9.4",
+    "openinference-instrumentation",
     "openinference-instrumentation-llama-index",
     "openinference-instrumentation-langchain",
     "openinference-instrumentation-vertexai",
