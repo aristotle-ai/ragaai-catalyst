@@ -6,8 +6,13 @@ from google import genai
 from google.genai.types import GenerateContentConfig
 from typing import Optional, List, Dict, Any
 import logging
-logger = logging.getLogger('LiteLLM')
-logger.setLevel(logging.ERROR)
+# logger = logging.getLogger('LiteLLM')
+# logger.setLevel(logging.ERROR)
+logger = logging.getLogger(__name__)
+logging_level = (
+    logger.setLevel(logging.DEBUG) if os.getenv("DEBUG") == "1" else logging.INFO
+)
+
 
 class GuardExecutor:
 
@@ -187,8 +192,13 @@ class GuardExecutor:
             return None, deployment_response
 
     @staticmethod
-    def execute_deployment_static(deployment_id, payload, gdm):
-        api = gdm.base_url + f'/guardrail/deployment/{deployment_id}/ingest'
+    def execute_deployment_static(deployment_id, payload, gdm, version):
+        if version.lower() == "v1":
+            api = gdm.base_url + f'/guardrail/deployment/{deployment_id}/ingest'
+            logger.info(f'Using version: {version.lower()}')
+        else:
+            api = gdm.base_url + f'/guardrails/deployment/{deployment_id}'
+            logger.info(f'Using version: v2')
         payload = json.dumps(payload)
         headers = {
             'x-project-id': str(gdm.project_id),
@@ -210,12 +220,12 @@ class GuardExecutor:
             return None
 
     @staticmethod
-    def execute_input_guardrail(input_deployment_id, prompt, context, gdm):
+    def execute_input_guardrail(input_deployment_id, prompt, context, gdm, version="v2"):
         doc = {
                 'prompt':prompt,
                 'context':context
                }
-        deployment_response = GuardExecutor.execute_deployment_static(input_deployment_id, doc, gdm)
+        deployment_response = GuardExecutor.execute_deployment_static(input_deployment_id, doc, gdm, version)
         if deployment_response and deployment_response['data']['status'].lower() == 'fail':
             return deployment_response['data']['alternateResponse'], deployment_response
         elif deployment_response:
@@ -224,14 +234,14 @@ class GuardExecutor:
             return None, None
     
     @staticmethod
-    def execute_output_guardrail(output_deployment_id, prompt, context, response, gdm, trace_id):
+    def execute_output_guardrail(output_deployment_id, prompt, context, response, gdm, trace_id, version="v2"):
         doc = {
                 'prompt':prompt,
                 'context':context,
                 'response':response,
                 'traceId':trace_id
                }
-        deployment_response = GuardExecutor.execute_deployment_static(output_deployment_id, doc, gdm)
+        deployment_response = GuardExecutor.execute_deployment_static(output_deployment_id, doc, gdm, version)
         if deployment_response and deployment_response['data']['status'].lower() == 'fail':
             return deployment_response['data']['alternateResponse'], deployment_response
         elif deployment_response:
