@@ -198,6 +198,7 @@ class GuardExecutor:
             logger.info(f'Using version: {version.lower()}')
         else:
             api = gdm.base_url + f'/guardrails/deployment/{deployment_id}'
+            api = api.replace('/api','')
             logger.info(f'Using version: v2')
         payload = json.dumps(payload)
         headers = {
