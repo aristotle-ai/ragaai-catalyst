@@ -199,7 +199,7 @@ class GuardExecutor:
         else:
             api = gdm.base_url + f'/guardrails/deployment/{deployment_id}'
             api = api.replace('/api','')
-            logger.info(f'Using version: v2')
+            logger.debug(f'Using version: v2')
         payload = json.dumps(payload)
         headers = {
             'x-project-id': str(gdm.project_id),
