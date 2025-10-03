@@ -744,7 +744,7 @@ class Tracer(AgenticTracing):
                     }
             payload = json.dumps({
                     "externalId": str(external_id),
-                    "feedbackColumnName": "_Response-feedBack",
+                    "feedbackColumnName": "_response-feedBack",
                     "feedback": feedback,
                     "datasetName": self.dataset_name
                     })
