@@ -307,8 +307,8 @@ class PromptManager:
                 f"Supported providers: {', '.join([p.rstrip('/') for p in valid_model_prefixes])}"
             )
         
-        model_lower = model.lower()
-        if not any(model_lower.startswith(prefix) for prefix in valid_model_prefixes):
+        model = model.lower()
+        if not any(model.startswith(prefix) for prefix in valid_model_prefixes):
             raise ValueError(
                 f"Unsupported model provider in '{model}'. "
                 f"Supported providers: {', '.join([p.rstrip('/') for p in valid_model_prefixes])}"
