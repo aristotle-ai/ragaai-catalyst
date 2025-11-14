@@ -170,7 +170,7 @@ class Tracer(AgenticTracing):
             logger.error(f"Failed to retrieve projects list: {e}")
 
         # Handle agentic tracers
-        if tracer_type == "agentic" or tracer_type.startswith("agentic/") or tracer_type == "langchain" or tracer_type == "llamaindex" or tracer_type == "google-adk" or tracer_type == "openai":
+        if tracer_type == "agentic" or tracer_type.startswith("agentic/") or tracer_type == "langchain" or tracer_type == "llamaindex" or tracer_type == "google-adk" or tracer_type == "openai" or tracer_type == "custom":
             # Setup instrumentors based on tracer type
             instrumentors = []
 
@@ -321,6 +321,9 @@ class Tracer(AgenticTracing):
             elif tracer_type == "openai":
                 from openinference.instrumentation.openai import OpenAIInstrumentor
                 instrumentors += [(OpenAIInstrumentor, [])]
+
+            elif tracer_type == "custom":
+                pass
 
             else:
                 # Unknown agentic tracer type
