@@ -1,4 +1,6 @@
 import os
+from sys import exception
+
 import requests
 import json
 import re
@@ -20,35 +22,42 @@ class PromptManager:
         self.timeout = 10
         self.size = 99999
 
+        token = os.getenv("RAGAAI_CATALYST_TOKEN")
+        if not token:
+            raise EnvironmentError("RAGAAI_CATALYST_TOKEN is not set in environment variables")
+
+        self.headers = {"Authorization": f"Bearer {token}"}
+
+        # 1. Fetch Project List
         try:
-            response = requests.get(
-                f"{RagaAICatalyst.BASE_URL}/v2/llm/projects?size={self.size}",
-                headers={
-                    "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
-                },
-                timeout=self.timeout,
-            )
+            url = f"{RagaAICatalyst.BASE_URL}/v2/llm/projects?size={self.size}"
+            response = requests.get(url, headers=self.headers, timeout=self.timeout)
             response.raise_for_status()
+        except requests.exceptions.Timeout:
+            raise TimeoutError("Timed out while fetching project list")
+        except requests.exceptions.RequestException as e:
+            raise ConnectionError(f"Failed to fetch project list: {str(e)}")
 
-            project_list = [
-                project["name"] for project in response.json()["data"]["content"]
-            ]
-            self.project_id = [
-            project["id"] for project in response.json()["data"]["content"] if project["name"]==project_name
-            ][0]
+        # 2. Parse JSON Response
+        try:
+            data = response.json()
+            projects = data["data"]["content"]
+            if not isinstance(projects, list):
+                raise ValueError("Invalid project list format received from server")
+        except (KeyError, json.JSONDecodeError):
+            raise ValueError("Unexpected response structure while parsing project list")
 
-        except (KeyError, json.JSONDecodeError) as e:
-            raise ValueError(f"Error parsing project list: {str(e)}")
-
+        # 3. Validate project_name and extract project_id
+        project_list = [p.get("name") for p in projects]
         if self.project_name not in project_list:
-            raise ValueError("Project not found. Please enter a valid project name")
+            raise ValueError(f"Project '{self.project_name}' not found. Please provide a valid project name.")
 
+        matching_projects = [p["id"] for p in projects if p.get("name") == self.project_name]
+        if not matching_projects:
+            raise ValueError(f"Project ID for '{self.project_name}' not found in response")
+        self.project_id = matching_projects[0]
 
-        self.headers = {
-                "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
-                "X-Project-Id": str(self.project_id)
-            }
-
+        self.headers["X-Project-Id"] = str(self.project_id)
 
     def list_prompts(self):
         prompt = Prompt()
