@@ -213,7 +213,7 @@ class PromptManager:
     def _extract_variables_from_text_fields(self, text_fields: List[Dict[str, str]]) -> List[str]:
         variables = set()
         pattern = r'\{\{(.*?)\}\}'
-        
+
         for field in text_fields:
             content = field.get('content', '')
             matches = re.findall(pattern, content)
@@ -221,7 +221,7 @@ class PromptManager:
                 var_name = match.strip()
                 if '"' not in var_name:
                     variables.add(var_name)
-        
+
         return sorted(list(variables))
 
     def _get_supported_models(self, provider_name):
@@ -302,6 +302,10 @@ class PromptManager:
                     f"Invalid role '{role}' in text_field at index {idx}. "
                     f"Role must be one of: {', '.join(valid_roles)}"
                 )
+
+            content = field.get('content')
+            if not content or not isinstance(content, str) or content.strip() == "":
+                raise ValueError(f"Content cannot be empty in text_field at index {idx}")
 
         if not model or not isinstance(model, str) or not model.strip():
             raise ValueError("Model must be a non-empty string")
