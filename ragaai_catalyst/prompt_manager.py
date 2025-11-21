@@ -99,7 +99,7 @@ class PromptManager:
 
         if prompt_name not in prompt_list:
             raise ValueError("Prompt not found. Please enter a valid prompt name")
-        
+
         prompt = Prompt()
         try:
             prompt_versions = prompt.list_prompt_versions(self.base_url, self.headers, self.timeout, prompt_name)
@@ -107,7 +107,7 @@ class PromptManager:
         except requests.RequestException as e:
             raise requests.RequestException(f"Error fetching prompt versions: {str(e)}")
 
-    def create_prompt(self, prompt_name: str, directory: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    def _create_prompt(self, prompt_name: str, directory: Optional[str] = None) -> Optional[Dict[str, Any]]:
         if not prompt_name or not prompt_name.strip():
             raise ValueError("Prompt name cannot be empty")
 
@@ -157,7 +157,7 @@ class PromptManager:
                 timeout=self.timeout
             )
             response.raise_for_status()
-            
+
             logger.info(f"Prompt '{prompt_name}' deleted successfully")
             return response.json()
         except requests.RequestException as e:
@@ -177,7 +177,7 @@ class PromptManager:
                 timeout=self.timeout
             )
             response.raise_for_status()
-            
+
             logger.info(f"Version '{version_id}' set as default successfully")
             return response.json()
         except requests.RequestException as e:
@@ -197,9 +197,9 @@ class PromptManager:
         metrics_specs: Optional[List[Dict[str, Any]]] = None,
         model_parameters: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
-        self.create_prompt(prompt_name=prompt_name, directory=directory)
-        
-        return self.save_prompt_version(
+        self._create_prompt(prompt_name=prompt_name, directory=directory)
+
+        return self._save_prompt_version(
             prompt_name=prompt_name,
             text_fields=text_fields,
             message=message,
@@ -270,7 +270,7 @@ class PromptManager:
         except Exception:
             return None
 
-    def save_prompt_version(
+    def _save_prompt_version(
         self,
         prompt_name: str,
         text_fields: List[Dict[str, str]],
@@ -387,9 +387,27 @@ class PromptManager:
                 timeout=self.timeout
             )
             response.raise_for_status()
-            
+
             response_data = response.json()
-            return response_data
+
+            # Extract relevant fields from API response
+            success = response_data.get('success', True)
+            message = response_data.get('message', 'Prompt version saved successfully')
+
+            data = response_data.get('data', {})
+            version_id = data.get('id')
+            prompt_name_resp = data.get('name') or prompt_name
+
+            result = {
+                'success': success,
+                'message': message,
+                'prompt_name': prompt_name_resp,
+                'version_id': version_id
+            }
+
+            logger.info(f"Prompt version saved successfully: {prompt_name} (version: {version_id})")
+            return result
+
         except requests.RequestException as e:
             raise requests.RequestException(f"Error saving prompt version: {str(e)}")
         except (KeyError, json.JSONDecodeError) as e:
