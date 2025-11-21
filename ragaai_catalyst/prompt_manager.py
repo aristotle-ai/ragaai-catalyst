@@ -2,9 +2,11 @@ import os
 from .tracers.agentic_tracing.upload.session_manager import session_manager
 import json
 import re
+import logging
+import uuid
+from typing import Optional, List, Dict, Any
 from .ragaai_catalyst import RagaAICatalyst
 import copy
-import logging
 from urllib3.exceptions import PoolError, MaxRetryError, NewConnectionError
 from requests.exceptions import ConnectionError, Timeout, RequestException
 from http.client import RemoteDisconnected
@@ -44,12 +46,19 @@ class PromptManager:
             response.raise_for_status()
             # logger.debug("Projects list retrieved successfully")
 
+            data = response.json()
             project_list = [
-                project["name"] for project in response.json()["data"]["content"]
+                project["name"] for project in data["data"]["content"]
             ]
-            self.project_id = [
-            project["id"] for project in response.json()["data"]["content"] if project["name"]==project_name
-            ][0]
+            matching_projects = [
+                project["id"] for project in data["data"]["content"] if project["name"] == project_name
+            ]
+
+            if not matching_projects:
+                logger.error(f"Project '{project_name}' not found. Please provide a valid project name.")
+                return
+
+            self.project_id = matching_projects[0]
 
         except (PoolError, MaxRetryError, NewConnectionError, ConnectionError, Timeout, RemoteDisconnected) as e:
             session_manager.handle_request_exceptions(e, "fetching project list")
@@ -59,11 +68,11 @@ class PromptManager:
             logger.error(f"Error while fetching project list: {e}")
             logger.error(f"PromptManager will have limited functionality")
             return
-        except (KeyError, json.JSONDecodeError) as e:
+        except (KeyError, json.JSONDecodeError, IndexError) as e:
             logger.error(f"Error parsing project list: {str(e)}")
             return
 
-        if self.project_name not in project_list:
+        if not self.project_id:
             logger.error("Project not found. Please enter a valid project name")
             return
 
@@ -136,15 +145,20 @@ class PromptManager:
 
     def _create_prompt(self, prompt_name: str, directory: Optional[str] = None) -> Optional[Dict[str, Any]]:
         if not prompt_name or not prompt_name.strip():
-            raise ValueError("Prompt name cannot be empty")
+            logger.warning("Prompt name cannot be empty")
+            return None
 
         try:
             existing_prompts = self.list_prompts()
             if prompt_name in existing_prompts:
                 logger.info(f"Prompt '{prompt_name}' already exists, skipping creation")
                 return
-        except requests.RequestException as e:
-            raise requests.RequestException(f"Error checking existing prompts: {str(e)}")
+        except (PoolError, MaxRetryError, NewConnectionError, ConnectionError, Timeout, RemoteDisconnected) as e:
+            session_manager.handle_request_exceptions(e, f"checking existing prompts for {prompt_name}")
+            return
+        except RequestException as e:
+            logger.error(f"Error checking existing prompts: {str(e)}")
+            return
 
         payload = {
             "name": prompt_name,
@@ -152,7 +166,8 @@ class PromptManager:
         }
 
         try:
-            response = requests.post(
+            response = session_manager.make_request_with_retry(
+                "POST",
                 self.base_url,
                 headers=self.headers,
                 json=payload,
@@ -160,25 +175,55 @@ class PromptManager:
             )
             response.raise_for_status()
             return response.json()
-        except requests.RequestException as e:
-            raise requests.RequestException(f"Error creating prompt: {str(e)}")
+        except (PoolError, MaxRetryError, NewConnectionError, ConnectionError, Timeout, RemoteDisconnected) as e:
+            session_manager.handle_request_exceptions(e, f"creating prompt {prompt_name}")
+            return
+        except RequestException as e:
+            logger.error(f"Error creating prompt: {str(e)}")
+            return
         except (KeyError, json.JSONDecodeError) as e:
-            raise ValueError(f"Error parsing response: {str(e)}")
+            logger.error(f"Error parsing response: {str(e)}")
+            return
 
     def delete_prompt(self, prompt_name: str) -> Dict[str, Any]:
         if not prompt_name or not prompt_name.strip():
-            raise ValueError("Prompt name cannot be empty")
+            error_msg = "Prompt name cannot be empty"
+            logger.error(error_msg)
+            return {
+                'success': False,
+                'message': error_msg,
+                'prompt_name': prompt_name
+            }
 
         try:
             existing_prompts = self.list_prompts()
             if prompt_name not in existing_prompts:
-                raise ValueError(f"Prompt '{prompt_name}' not found")
-        except requests.RequestException as e:
-            raise requests.RequestException(f"Error checking existing prompts: {str(e)}")
+                error_msg = f"Prompt '{prompt_name}' not found"
+                logger.error(error_msg)
+                return {
+                    'success': False,
+                    'message': error_msg,
+                    'prompt_name': prompt_name
+                }
+        except (PoolError, MaxRetryError, NewConnectionError, ConnectionError, Timeout, RemoteDisconnected) as e:
+            session_manager.handle_request_exceptions(e, f"checking existing prompts for {prompt_name}")
+            return {
+                'success': False,
+                'message': f"Error checking existing prompts: {str(e)}",
+                'prompt_name': prompt_name
+            }
+        except RequestException as e:
+            logger.error(f"Error checking existing prompts: {str(e)}")
+            return {
+                'success': False,
+                'message': f"Error checking existing prompts: {str(e)}",
+                'prompt_name': prompt_name
+            }
 
         try:
             delete_url = f"{self.base_url}/{prompt_name}"
-            response = requests.delete(
+            response = session_manager.make_request_with_retry(
+                "DELETE",
                 delete_url,
                 headers=self.headers,
                 timeout=self.timeout
@@ -187,18 +232,42 @@ class PromptManager:
 
             logger.info(f"Prompt '{prompt_name}' deleted successfully")
             return response.json()
-        except requests.RequestException as e:
-            raise requests.RequestException(f"Error deleting prompt: {str(e)}")
+        except (PoolError, MaxRetryError, NewConnectionError, ConnectionError, Timeout, RemoteDisconnected) as e:
+            session_manager.handle_request_exceptions(e, f"deleting prompt {prompt_name}")
+            return {
+                'success': False,
+                'message': f"Error deleting prompt: {str(e)}",
+                'prompt_name': prompt_name
+            }
+        except RequestException as e:
+            logger.error(f"Error deleting prompt: {str(e)}")
+            return {
+                'success': False,
+                'message': f"Error deleting prompt: {str(e)}",
+                'prompt_name': prompt_name
+            }
         except (KeyError, json.JSONDecodeError) as e:
-            raise ValueError(f"Error parsing response: {str(e)}")
+            logger.error(f"Error parsing response: {str(e)}")
+            return {
+                'success': False,
+                'message': f"Error parsing response: {str(e)}",
+                'prompt_name': prompt_name
+            }
 
     def set_version_as_default(self, version_id: int) -> Dict[str, Any]:
         if not version_id or not isinstance(version_id, int):
-            raise ValueError("Version ID must be a valid integer")
+            error_msg = "Version ID must be a valid integer"
+            logger.error(error_msg)
+            return {
+                'success': False,
+                'message': error_msg,
+                'version_id': version_id
+            }
 
         try:
             default_url = f"{self.base_url}/version/{version_id}/default"
-            response = requests.put(
+            response = session_manager.make_request_with_retry(
+                "PUT",
                 default_url,
                 headers=self.headers,
                 timeout=self.timeout
@@ -207,10 +276,27 @@ class PromptManager:
 
             logger.info(f"Version '{version_id}' set as default successfully")
             return response.json()
-        except requests.RequestException as e:
-            raise requests.RequestException(f"Error setting version as default: {str(e)}")
+        except (PoolError, MaxRetryError, NewConnectionError, ConnectionError, Timeout, RemoteDisconnected) as e:
+            session_manager.handle_request_exceptions(e, f"setting version {version_id} as default")
+            return {
+                'success': False,
+                'message': f"Error setting version as default: {str(e)}",
+                'version_id': version_id
+            }
+        except RequestException as e:
+            logger.error(f"Error setting version as default: {str(e)}")
+            return {
+                'success': False,
+                'message': f"Error setting version as default: {str(e)}",
+                'version_id': version_id
+            }
         except (KeyError, json.JSONDecodeError) as e:
-            raise ValueError(f"Error parsing response: {str(e)}")
+            logger.error(f"Error parsing response: {str(e)}")
+            return {
+                'success': False,
+                'message': f"Error parsing response: {str(e)}",
+                'version_id': version_id
+            }
 
     def create_or_update_prompt(
         self,
@@ -254,7 +340,8 @@ class PromptManager:
     def _get_supported_models(self, provider_name):
         try:
             models_url = f"{RagaAICatalyst.BASE_URL}/v1/llm/models"
-            response = requests.post(
+            response = session_manager.make_request_with_retry(
+                "POST",
                 models_url,
                 headers=self.headers,
                 json={"providerName": provider_name},
@@ -266,13 +353,17 @@ class PromptManager:
             if data.get("success") and "data" in data:
                 return [model["name"] for model in data["data"]]
             return []
+        except (PoolError, MaxRetryError, NewConnectionError, ConnectionError, Timeout, RemoteDisconnected) as e:
+            session_manager.handle_request_exceptions(e, f"getting supported models for {provider_name}")
+            return []
         except Exception:
             return []
 
     def _get_model_parameters(self, provider_name, model_name):
         try:
             params_url = f"{RagaAICatalyst.BASE_URL}/playground/providers/models/parameters/list"
-            response = requests.post(
+            response = session_manager.make_request_with_retry(
+                "POST",
                 params_url,
                 headers=self.headers,
                 json={"providerName": provider_name, "modelName": model_name},
@@ -385,10 +476,17 @@ class PromptManager:
         if model_parameters is None:
             fetched_params = self._get_model_parameters(provider_name, model_name)
             if not fetched_params:
-                raise ValueError(
+                error_msg = (
                     f"Unable to fetch model parameters for '{model}'. "
                     f"Please verify the model name or provide model_parameters explicitly."
                 )
+                logger.error(error_msg)
+                return {
+                    'success': False,
+                    'message': error_msg,
+                    'prompt_name': prompt_name,
+                    'version_id': None
+                }
             model_parameters = fetched_params
 
         payload = {
@@ -407,7 +505,8 @@ class PromptManager:
 
         try:
             version_url = f"{self.base_url}/{prompt_name}/version"
-            response = requests.post(
+            response = session_manager.make_request_with_retry(
+                "POST",
                 version_url,
                 headers=self.headers,
                 json=payload,
@@ -435,10 +534,30 @@ class PromptManager:
             logger.info(f"Prompt version saved successfully: {prompt_name} (version: {version_id})")
             return result
 
-        except requests.RequestException as e:
-            raise requests.RequestException(f"Error saving prompt version: {str(e)}")
+        except (PoolError, MaxRetryError, NewConnectionError, ConnectionError, Timeout, RemoteDisconnected) as e:
+            session_manager.handle_request_exceptions(e, f"saving prompt version for {prompt_name}")
+            return {
+                'success': False,
+                'message': f"Error saving prompt version: {str(e)}",
+                'prompt_name': prompt_name,
+                'version_id': None
+            }
+        except RequestException as e:
+            logger.error(f"Error saving prompt version: {str(e)}")
+            return {
+                'success': False,
+                'message': f"Error saving prompt version: {str(e)}",
+                'prompt_name': prompt_name,
+                'version_id': None
+            }
         except (KeyError, json.JSONDecodeError) as e:
-            raise ValueError(f"Error parsing response: {str(e)}")
+            logger.error(f"Error parsing response: {str(e)}")
+            return {
+                'success': False,
+                'message': f"Error parsing response: {str(e)}",
+                'prompt_name': prompt_name,
+                'version_id': None
+            }
 
 
 class Prompt:
