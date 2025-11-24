@@ -54,7 +54,6 @@ class Tracer(AgenticTracing):
             'custom':True
         },
         interval_time=2,
-        # auto_instrumentation=True/False  # to control automatic instrumentation of everything
         max_upload_workers=30,
         external_id=None
 
@@ -126,8 +125,6 @@ class Tracer(AgenticTracing):
         self.dataset_name = dataset_name
         self.tracer_type = tracer_type
         self.metadata = self._improve_metadata(metadata, tracer_type)
-        # self.metadata["total_cost"] = 0.0
-        # self.metadata["total_tokens"] = 0
         self.pipeline = pipeline
         self.description = description
         self.timeout = timeout
@@ -167,15 +164,13 @@ class Tracer(AgenticTracing):
                 self.project_id = [
                     project["id"] for project in response.json()["data"]["content"] if project["name"] == project_name
                 ][0]
-            # super().__init__(user_detail=self._pass_user_data())
-            # self.file_tracker = TrackName()
             self._pass_user_data()
 
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to retrieve projects list: {e}")
 
         # Handle agentic tracers
-        if tracer_type == "agentic" or tracer_type.startswith("agentic/") or tracer_type == "langchain" or tracer_type == "llamaindex" or tracer_type == "google-adk":
+        if tracer_type == "agentic" or tracer_type.startswith("agentic/") or tracer_type == "langchain" or tracer_type == "llamaindex" or tracer_type == "google-adk" or tracer_type == "openai" or tracer_type == "custom":
             # Setup instrumentors based on tracer type
             instrumentors = []
 
@@ -322,6 +317,14 @@ class Tracer(AgenticTracing):
             elif tracer_type == "google-adk":
                 from  openinference.instrumentation.google_adk import GoogleADKInstrumentor
                 instrumentors += [(GoogleADKInstrumentor, [])]
+
+            elif tracer_type == "openai":
+                from openinference.instrumentation.openai import OpenAIInstrumentor
+                instrumentors += [(OpenAIInstrumentor, [])]
+
+            elif tracer_type == "custom":
+                pass
+
             else:
                 # Unknown agentic tracer type
                 logger.warning(f"Unknown agentic tracer type: {tracer_type}")
@@ -329,46 +332,9 @@ class Tracer(AgenticTracing):
                 return
                 
             # Common setup for all agentic tracers
-            self._setup_agentic_tracer(instrumentors)
+            self._tracer = self._setup_agentic_tracer(instrumentors)
         else:
             self._upload_task = None
-            # raise ValueError (f"Currently supported tracer types are 'langchain' and 'llamaindex'.")
-
-    def set_model_cost(self, cost_config):
-        """
-        Set custom cost values for a specific model.
-
-        Args:
-            cost_config (dict): Dictionary containing model cost configuration with keys:
-                - model_name (str): Name of the model
-                - input_cost_per_token (float): Cost per input token
-                - output_cost_per_token (float): Cost per output token
-
-        Example:
-            tracer.set_model_cost({
-                "model_name": "gpt-4",
-                "input_cost_per_million_token": 6,
-                "output_cost_per_million_token": 2.40
-            })
-        """
-        logger.info("DEPRECATED: The set_model_cost method is deprecated and will be removed in a future version. Custom model costs can now be configured directly through the RagaAI Catalyst Platform")
-        print("DEPRECATED: The set_model_cost method is deprecated and will be removed in a future version. Custom model costs can now be configured directly through the RagaAI Catalyst Platform")
-        # if not isinstance(cost_config, dict):
-        #     logger.error("cost_config must be a dictionary")
-
-        # required_keys = {"model_name", "input_cost_per_million_token", "output_cost_per_million_token"}
-        # if not all(key in cost_config for key in required_keys):
-        #     logger.error(f"cost_config must contain all required keys: {required_keys}")
-
-        # model_name = cost_config["model_name"]
-        # self.model_custom_cost[model_name] = {
-        #     "input_cost_per_token": float(cost_config["input_cost_per_million_token"])/ 1000000,
-        #     "output_cost_per_token": float(cost_config["output_cost_per_million_token"]) /1000000
-        # }
-        # self.dynamic_exporter.custom_model_cost = self.model_custom_cost
-        # logger.info(f"Updated custom model cost for {model_name}: {self.model_custom_cost[model_name]}")
-        return None
-        
 
     def register_masking_function(self, masking_func):
         """
@@ -426,7 +392,6 @@ class Tracer(AgenticTracing):
             with open(original_path, 'r') as f:
                 data = json.load(f)
             
-            # Apply masking only to data['data'] or in case of langchain rag apply on 'traces' field of each element
             if 'data' in data:
                 data['data'] = recursive_mask_values(data['data'])
             elif isinstance(data,list):
@@ -436,7 +401,7 @@ class Tracer(AgenticTracing):
                         item['traces'] = recursive_mask_values(item['traces'])
                         masked_traces.append(item)
                 data = masked_traces
-            # Create new filename with 'processed_' prefix 
+            
             new_filename = f"processed_{original_path.name}"
             dir_name, original_filename = os.path.split(original_trace_json_path)
             final_trace_json_path = Path(dir_name) / new_filename
@@ -448,7 +413,6 @@ class Tracer(AgenticTracing):
             logger.debug(f"Created masked trace file: {final_trace_json_path}")
             return final_trace_json_path
 
-        # Register the created post-processor
         self.register_post_processor(file_post_processor)
         logger.debug("Masking function registered successfully as post-processor")
 
@@ -466,15 +430,13 @@ class Tracer(AgenticTracing):
         if not callable(post_processor_func):
             logger.error("post_processor_func must be a callable")
         self.post_processor = post_processor_func
-        # Register in parent AgenticTracing class
         super().register_post_processor(post_processor_func)
-        # Update DynamicTraceExporter's post-processor if it exists
         if hasattr(self, 'dynamic_exporter'):
             self.dynamic_exporter._exporter.post_processor = post_processor_func
             self.dynamic_exporter._post_processor = post_processor_func
         logger.info("Registered post process as: "+str(post_processor_func))
 
-    
+
     def set_external_id(self, external_id):
         """
         This method updates the external_id attribute of the dynamic exporter.
@@ -536,9 +498,7 @@ class Tracer(AgenticTracing):
             except Exception as e:
                 logger.error(f"Error during tracer shutdown: {str(e)}")
 
-        # Reset instrumentation flag
         self.is_instrumented = False
-        # Note: We're not resetting all attributes here to allow for upload status checking
 
     def _pass_user_data(self):
         user_detail = {
@@ -564,7 +524,7 @@ class Tracer(AgenticTracing):
     def update_dynamic_exporter(self, **kwargs):
         """
         Update the dynamic exporter's properties.
-        
+
         Args:
             **kwargs: Keyword arguments to update. Can include any of the following:
                 - files_to_zip: List of files to zip
@@ -574,31 +534,25 @@ class Tracer(AgenticTracing):
                 - user_details: User details
                 - base_url: Base URL for API
                 - custom_model_cost: Dictionary of custom model costs
-                
+
         Raises:
             AttributeError: If the tracer_type is not an agentic tracer or if the dynamic_exporter is not initialized.
         """
         if not self.tracer_type.startswith("agentic/") or not hasattr(self, "dynamic_exporter"):
             logger.error("This method is only available for agentic tracers with a dynamic exporter.")
-            
+
         for key, value in kwargs.items():
             if hasattr(self.dynamic_exporter, key):
                 setattr(self.dynamic_exporter, key, value)
                 logger.debug(f"Updated dynamic exporter's {key} to {value}")
             else:
                 logger.warning(f"Dynamic exporter has no attribute '{key}'")
-                
+
     def _setup_agentic_tracer(self, instrumentors):
-        """
-        Common setup for all agentic tracers.
-        
-        Args:
-            instrumentors (list): List of tuples (instrumentor_class, args) to be instrumented
-        """
-        from opentelemetry.sdk import trace as trace_sdk
         from opentelemetry.sdk.trace.export import SimpleSpanProcessor
         from ragaai_catalyst.tracers.exporters.dynamic_trace_exporter import DynamicTraceExporter
-        
+        from openinference.instrumentation import TracerProvider, TraceConfig
+
         # Get the code_files
         self.file_tracker.trace_main_file()
         list_of_unique_files = self.file_tracker.get_unique_files()
@@ -622,7 +576,7 @@ class Tracer(AgenticTracing):
         )
         
         # Set up tracer provider
-        tracer_provider = trace_sdk.TracerProvider()
+        tracer_provider = TracerProvider(config=TraceConfig())
         tracer_provider.add_span_processor(SimpleSpanProcessor(self.dynamic_exporter))
         
         # Instrument all specified instrumentors
@@ -636,21 +590,23 @@ class Tracer(AgenticTracing):
             
             # Instrument with the provided tracer provider and arguments
             instrumentor.instrument(tracer_provider=tracer_provider, *args)
-            
+
+        return tracer_provider.get_tracer(__name__)
+
     def update_file_list(self):
         """
         Update the file list in the dynamic exporter with the latest tracked files.
         This is useful when new files are added to the project during execution.
-        
+
         Raises:
             AttributeError: If the tracer_type is not 'agentic/llamaindex' or if the dynamic_exporter is not initialized.
         """
         if not self.tracer_type.startswith("agentic/") or not hasattr(self, "dynamic_exporter"):
             logger.error("This method is only available for agentic tracers with a dynamic exporter.")
-            
+
         # Get the latest list of unique files
         list_of_unique_files = self.file_tracker.get_unique_files()
-        
+
         # Update the dynamic exporter's files_to_zip property
         self.dynamic_exporter.files_to_zip = list_of_unique_files
         logger.debug(f"Updated dynamic exporter's files_to_zip with {len(list_of_unique_files)} files")
@@ -666,7 +622,6 @@ class Tracer(AgenticTracing):
             logger.warning("add_context is only supported for 'langchain' and 'llamaindex' tracer types")
             return
         
-        # Convert string context to string if needed
         if isinstance(context, str):
             self.dynamic_exporter.user_context = context
             self.user_context = context
@@ -684,13 +639,12 @@ class Tracer(AgenticTracing):
             logger.warning("add_gt is only supported for 'langchain' and 'llamaindex' tracer types")
             return
         
-        # Convert string gt to string if needed
         if isinstance(gt, str):
             self.dynamic_exporter.user_gt = gt
             self.user_gt = gt
         else:
             logger.warning("gt must be a string")
-    
+
     def add_metadata(self, metadata):
         """
         Add metadata information to the trace. If metadata is a dictionary, it will be merged with existing metadata.
@@ -698,7 +652,7 @@ class Tracer(AgenticTracing):
 
         Args:
             metadata: Additional metadata information to be added to the trace. Should be a dictionary.
-        """        
+        """
         # Convert string metadata to string if needed
         user_details = self.user_details
         user_metadata = user_details["trace_user_detail"]["metadata"]
@@ -721,20 +675,20 @@ class Tracer(AgenticTracing):
         """
         self.dynamic_exporter.project_name = project_name
         logger.debug(f"Updated dynamic exporter's project_name to {project_name}")
-    
+
     def set_feedback(self, external_id, feedback):
         """
         This method updates the feedback on a specifc trace with a given external_id
         """
-        try:            
+        try:
             if not external_id:
                 logger.error("external_id is required but not provided in set_feedback")
                 return None
-            
+
             if not feedback:
                 logger.error("feedback is required but not provided in set_feedback")
                 return None
-            
+
             base_url = f"{self.base_url}/v1/llm/feedback"
             headers={
                         'Accept': 'application/json, text/plain, */*',
@@ -754,7 +708,7 @@ class Tracer(AgenticTracing):
             if response.json().get('data', {}).get('status', '') == 200:
                 logger.info(f"{response.json().get('data', {}).get('message', '')} for project {self.project_name} with external_id {external_id}")
                 return response.json()
-            
+
             elif response.json().get('data', {}).get('status', '') == 404:
                 #No externalId found
                 logger.error(response.json().get('data', {}).get('message', ''))
@@ -770,7 +724,7 @@ class Tracer(AgenticTracing):
                 logger.error(response.json().get('message', ''))
                 return response.json()
 
-            
+
             else:
                 logger.error("Failed to set feedback")
                 return None
@@ -780,3 +734,7 @@ class Tracer(AgenticTracing):
         except Exception as e:
             logger.error(f"Error in _set_feedback: {str(e)}")
             return None
+
+    @property
+    def tracer(self):
+        return self._tracer
