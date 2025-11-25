@@ -63,6 +63,8 @@ def convert_input(messages, model_config, user_id):
       "messages": messages,
       "user_id": user_id
     }
+    if "encrypted_secrets_map" in model_config:
+        doc_input["encrypted_secrets_map"] = model_config["encrypted_secrets_map"]
     return doc_input
 
 

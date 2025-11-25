@@ -195,7 +195,7 @@ class SyntheticDataGeneration:
             try:
                 if provider == "gemini" and api_base:
                     messages = [{'role': 'user', 'content': system_message + text}]
-                    response = proxy_api_completion(messages=messages, model=model_config["model"], api_base=api_base)
+                    response = proxy_api_completion(messages=messages, model=model_config["model"], api_base=api_base, model_config=model_config)
                     # response = proxy_call.api_completion(messages=messages, model=model_config["model"], api_base=api_base)
                     return pd.DataFrame(ast.literal_eval(response[0]))
                 else:
@@ -318,6 +318,9 @@ class SyntheticDataGeneration:
             completion_params["temperature"] = model_config["temperature"]
         if 'provider' in model_config:
             completion_params['model'] = f'{model_config["provider"]}/{model_config["model"]}'
+        encrypted_secrets_map = model_config.get("encrypted_secrets_map")
+        if encrypted_secrets_map:
+            completion_params["encrypted_secrets_map"] = encrypted_secrets_map
 
         # Make the API call using LiteLLM
         try:
@@ -382,6 +385,9 @@ class SyntheticDataGeneration:
             completion_params["temperature"] = model_config["temperature"]
         if 'provider' in model_config:
             completion_params['model'] = f'{model_config["provider"]}/{model_config["model"]}'
+        encrypted_secrets_map = model_config.get("encrypted_secrets_map")
+        if encrypted_secrets_map:
+            completion_params["encrypted_secrets_map"] = encrypted_secrets_map
 
         try:
             response = completion(**completion_params)

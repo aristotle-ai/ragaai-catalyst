@@ -124,6 +124,8 @@ def convert_input(prompt,model,model_config):
     if model_config.get('log_level','')=='debug':
         logger.info(f"Using model configs Job ID {model_config.get('job_id',-1)}{doc_input}")
     doc_input['task']['input']['contents'][0]['parts'] = [{"text":prompt[0]['content']}]
+    if "encrypted_secrets_map" in model_config:
+        doc_input["encrypted_secrets_map"] = model_config["encrypted_secrets_map"]
     return doc_input
 
 
