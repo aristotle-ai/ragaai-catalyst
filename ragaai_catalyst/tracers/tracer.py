@@ -1,29 +1,17 @@
 import os
-import uuid
 import datetime
 import logging
-import asyncio
-import aiohttp
 import requests
 from litellm import model_cost
 from pathlib import Path
-from contextlib import contextmanager
-from concurrent.futures import ThreadPoolExecutor
-import tempfile
 import json
-import numpy as np
-from opentelemetry.sdk import trace as trace_sdk
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-from ragaai_catalyst.tracers.exporters.file_span_exporter import FileSpanExporter
-from ragaai_catalyst.tracers.utils import get_unique_key
 from openinference.instrumentation.langchain import LangChainInstrumentor
 from ragaai_catalyst import RagaAICatalyst
-from .agentic_tracing.upload.session_manager import session_manager
+from ragaai_catalyst.session_manager import session_manager
 from urllib3.exceptions import PoolError, MaxRetryError, NewConnectionError
 from requests.exceptions import ConnectionError, Timeout
 from http.client import RemoteDisconnected
 from ragaai_catalyst.tracers.agentic_tracing import AgenticTracing
-from ragaai_catalyst.tracers.exporters.ragaai_trace_exporter import RAGATraceExporter
 from ragaai_catalyst.tracers.agentic_tracing.utils.file_name_tracker import TrackName
 
 logger = logging.getLogger(__name__)
