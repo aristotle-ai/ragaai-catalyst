@@ -1,5 +1,4 @@
 import os
-from sys import exception
 
 import requests
 import json
