@@ -6,8 +6,13 @@ from google import genai
 from google.genai.types import GenerateContentConfig
 from typing import Optional, List, Dict, Any
 import logging
-logger = logging.getLogger('LiteLLM')
-logger.setLevel(logging.ERROR)
+# logger = logging.getLogger('LiteLLM')
+# logger.setLevel(logging.ERROR)
+logger = logging.getLogger(__name__)
+logging_level = (
+    logger.setLevel(logging.DEBUG) if os.getenv("DEBUG") == "1" else logging.INFO
+)
+
 
 class GuardExecutor:
 
@@ -36,13 +41,10 @@ class GuardExecutor:
         for key in field_map.keys():
             if key not in ['prompt','context','response','instruction']:
                 logger.error('Keys in field map should be in ["prompt","context","response","instruction"]')
-        self.current_trace_id = None
         self.id_2_doc = {}
 
     def execute_deployment(self, deployment_id, payload):
         api = self.base_url + f'/guardrail/deployment/{deployment_id}/ingest'
-        if self.current_trace_id:
-            payload['traceId'] = self.current_trace_id
         payload = json.dumps(payload)
         headers = {
             'x-project-id': str(self.guard_manager.project_id),
@@ -52,10 +54,11 @@ class GuardExecutor:
         try:
             response = requests.request("POST", api, headers=headers, data=payload,timeout=self.guard_manager.timeout)
         except Exception as e:
-            logger.error('Failed running guardrail: ',str(e))
+            logger.error(f'Failed running guardrail: {str(e)}')
             return None
         if response.status_code!=200:
-            logger.error('Error in running deployment ',response.json()['message'])
+            logger.error(f'Error in running deployment {response.json()["message"]}')
+            return None
         if response.json()['success']:
             return response.json()
         else:
@@ -67,9 +70,6 @@ class GuardExecutor:
                     'role':'user',
                     'content':prompt
                     }]
-        if self.current_trace_id:
-            doc = self.id_2_doc[self.current_trace_id]
-            messages[0]['content'] = messages[0]['content'] + '\n' + doc.get('context','')
         if llm_caller == 'litellm':
             model_params['messages'] = messages
             response = litellm.completion(**model_params)
@@ -164,109 +164,88 @@ class GuardExecutor:
         return doc
 
     def execute_input_guardrails(self, prompt, prompt_params):
-        self.current_trace_id =None
         doc = self.set_variables(prompt,prompt_params)
         deployment_response = self.execute_deployment(self.input_deployment_id,doc)
-        self.current_trace_id = deployment_response['data']['results'][0]['executionId']
-        self.id_2_doc[self.current_trace_id] = doc
+        trace_id = deployment_response['data']['results'][0]['executionId']
+        self.id_2_doc[trace_id] = doc
         if deployment_response and deployment_response['data']['status'].lower() == 'fail':
             return deployment_response['data']['alternateResponse'], deployment_response
         elif deployment_response:
             return None, deployment_response
 
-    def execute_output_guardrails(self, llm_response: str, prompt=None, prompt_params=None) -> None:
+    def execute_output_guardrails(self, llm_response: str, trace_id:str, prompt=None, prompt_params=None) -> None:
         if not prompt: # user has not passed input
-            if self.current_trace_id not in self.id_2_doc:
-                logger.error(f'No input doc found for trace_id: {self.current_trace_id}')
+            if trace_id not in self.id_2_doc:
+                logger.error(f'No input doc found for trace_id: {trace_id}')
             else:
-                doc = self.id_2_doc[self.current_trace_id]
+                doc = self.id_2_doc[trace_id]
                 doc['response'] = llm_response
         else:
             doc = self.set_variables(prompt,prompt_params)
+            doc['response'] = llm_response
+        doc['traceId'] = trace_id
         deployment_response = self.execute_deployment(self.output_deployment_id,doc)
-        del self.id_2_doc[self.current_trace_id]
-        self.current_trace_id = None
+        del self.id_2_doc[trace_id]
         if deployment_response and deployment_response['data']['status'].lower() == 'fail':
             return deployment_response['data']['alternateResponse'], deployment_response
         elif deployment_response:
             return None, deployment_response
 
-
-        '''
-        # doc = dict()
-        # doc['response'] = llm_response
-        # if trace_id:
-        #     doc['trace_id'] = trace_id
-        trace_id = self.current_trace_id
-        if not trace_id:
-            for key in self.field_map:
-                if key not in ['prompt', 'response']:
-                    if not prompt_params or self.field_map[key] not in prompt_params:
-                        if key not in self.id_2_doc.get('latest', {}):
-                            raise ValueError(f'{key} added as field map but not passed as prompt parameter or set in executor')
-                elif key == 'prompt':
-                    if not messages:
-                        if key not in self.id_2_doc.get('latest', {}):
-                            raise ValueError('messages should be provided when prompt is used as field or prompt should be set in executor')
-            # raise Exception(f'\'doc_id\' not provided and there is no doc_id currently available. Either run \'execute_input_guardrails\' or pass a valid \'doc_id\'')
-            #deployment_details = self.guard_manager.get_deployment(self.output_deployment_id)
-            #deployed_guardrails = deployment_details['data']['guardrailsResponse']
-            
-            for guardrail in deployed_guardrails:
-                metric_spec_mappings = guardrail['metricSpec']['config']['mappings']
-                var_names = [mapping['variableNmae'].lower() for mapping in metric_spec_mappings]
-                for var_name in var_names:
-                    if var_name not in ['prompt', 'response']:
-                        if var_name not in self.field_map:
-                            raise ValueError(f'{var_name} requrired for {guardrail} guardrail in deployment {self.deployment_id} but not added as field map')
-                        if not prompt_params or (self.field_map[var_name] not in prompt_params):
-                            if var_name not in self.id_2_doc.get('latest', {}):
-                                raise ValueError(f'{var_name} added as field map but not passed as prompt parameter')
-                        elif var_name == 'prompt':
-                            if not messages:
-                                if var_name not in self.id_2_doc.get('latest', {}):
-                                    raise ValueError('messages must be provided if doc_id is not provided')
-            
-            prompt = None
-            if messages:
-                for msg in messages:
-                    if 'role' in msg:
-                        if msg['role'] == 'user':
-                            prompt = msg['content']
-            else:
-                prompt = self.id_2_doc['latest']['prompt']
-            context_var = self.field_map.get('context', None)
-            doc = dict()
-            doc['prompt'] = prompt
-            if context_var and prompt_params and context_var in prompt_params:
-                doc['context'] = prompt_params[self.field_map[context_var]]
-            elif context_var:
-                doc['context'] = self.id_2_doc['latest']['context']
-            elif 'latest' in self.id_2_doc and 'context' in self.id_2_doc['latest'] and self.id_2_doc['latest']['context']:
-                doc['context'] = self.id_2_doc['latest']['context']
-            else:
-                doc['context'] = ''
-            if 'instruction' in self.field_map:
-                if prompt_params and 'instruction' in prompt_params:
-                    instruction = prompt_params[self.field_map['instruction']]
-                elif 'latest' in self.id_2_doc and 'instruction' in self.id_2_doc['latest'] and self.id_2_doc['latest']['instruction']:
-                    instruction = self.id_2_doc['latest']['instruction']
-                else:
-                    raise ValueError('instruction added as field map but not passed as prompt parameter or set in executor')
-                doc['instruction'] = instruction
-        elif trace_id not in self.id_2_doc:
-            raise Exception(f'trace_id {trace_id} is not valid. Please run \'execute_input_guardrails\' first')
+    @staticmethod
+    def execute_deployment_static(deployment_id, payload, gdm, version):
+        if version.lower() == "v1":
+            api = gdm.base_url + f'/guardrail/deployment/{deployment_id}/ingest'
+            logger.info(f'Using version: {version.lower()}')
         else:
-            doc = self.id_2_doc[trace_id]
-        doc['response'] = llm_response
-        response = self.execute_deployment(doc)
-        if response and response['data']['status'] == 'FAIL':
-            print('Guardrail deployment run retured failed status, replacing with alternate response')
-            return response['data']['alternateResponse'], llm_response, response
+            api = gdm.base_url + f'/guardrails/deployment/{deployment_id}'
+            api = api.replace('/api','')
+            logger.debug(f'Using version: v2')
+        payload = json.dumps(payload)
+        headers = {
+            'x-project-id': str(gdm.project_id),
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}'
+        }
+        try:
+            response = requests.request("POST", api, headers=headers, data=payload,timeout=gdm.timeout)
+        except Exception as e:
+            logger.error(f'Failed running guardrail: {str(e)}')
+            return None
+        if response.status_code!=200:
+            logger.error(f'Error in running deployment {response.json()["message"]}')
+            return None
+        if response.json()['success']:
+            return response.json()
         else:
-            self.current_trace_id = None
-            return None, llm_response, response
-            '''
+            print(response.json()['message'])
+            return None
 
-
-
+    @staticmethod
+    def execute_input_guardrail(input_deployment_id, prompt, context, gdm, version="v2"):
+        doc = {
+                'prompt':prompt,
+                'context':context
+               }
+        deployment_response = GuardExecutor.execute_deployment_static(input_deployment_id, doc, gdm, version)
+        if deployment_response and deployment_response['data']['status'].lower() == 'fail':
+            return deployment_response['data']['alternateResponse'], deployment_response
+        elif deployment_response:
+            return None, deployment_response
+        else:
+            return None, None
+    
+    @staticmethod
+    def execute_output_guardrail(output_deployment_id, prompt, context, response, gdm, trace_id, version="v2"):
+        doc = {
+                'prompt':prompt,
+                'context':context,
+                'response':response,
+                'traceId':trace_id
+               }
+        deployment_response = GuardExecutor.execute_deployment_static(output_deployment_id, doc, gdm, version)
+        if deployment_response and deployment_response['data']['status'].lower() == 'fail':
+            return deployment_response['data']['alternateResponse'], deployment_response
+        elif deployment_response:
+            return None, deployment_response
+        else:
+            return None, None

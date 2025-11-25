@@ -194,7 +194,7 @@ def convert_json_format(
                         model_name = metadata.get("ls_model_name", "")
                     except Exception as e:
                         model_name = ""
-                        logger.error(f"Failed to parse metadata: {e}", exc_info=True)
+                        logger.warning(f"Failed to parse metadata: {e}", exc_info=True)
                 if model_name and span["attributes"].get("openinference.span.kind") == "LLM":
                     try:
                         model_costs = get_model_cost()
