@@ -12,11 +12,12 @@ def api_completion(messages, model_config, kwargs):
     while attempts < 3:
 
         user_id = kwargs.get('user_id', '1')
+        encrypted_secrets_map = kwargs.get('encrypted_secrets_map', {})
         internal_llm_proxy = kwargs.get('internal_llm_proxy', -1)
             
             
         job_id = model_config.get('job_id',-1)
-        converted_message = convert_input(messages,model_config, user_id)
+        converted_message = convert_input(messages,model_config, user_id, encrypted_secrets_map)
         payload = json.dumps(converted_message)
         headers = {
             'Content-Type': 'application/json',
@@ -56,12 +57,13 @@ def get_username():
     return result
 
 
-def convert_input(messages, model_config, user_id):
+def convert_input(messages, model_config, user_id, encrypted_secrets_map):
     doc_input = {
       "model": model_config.get('model'),
       **model_config,
       "messages": messages,
-      "user_id": user_id
+      "user_id": user_id,
+      "encrypted_secrets_map": encrypted_secrets_map
     }
     return doc_input
 
