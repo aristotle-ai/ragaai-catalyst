@@ -23,6 +23,7 @@ class FileSpanExporter(SpanExporter):
         metadata=None,
         pipeline=None,
         raga_client=None,
+        upload_timeout=120,
     ):
         """
         Initializes the FileSpanExporter.
@@ -32,6 +33,7 @@ class FileSpanExporter(SpanExporter):
             session_id (str, optional): The session ID. Defaults to None.
             metadata (dict, optional): Metadata information. Defaults to None.
             pipeline (dict, optional): The pipeline configuration. Defaults to None.
+            upload_timeout (int, optional): Timeout for upload operations in seconds. Defaults to 120.
 
         Returns:
             None
@@ -41,7 +43,7 @@ class FileSpanExporter(SpanExporter):
         self.metadata = metadata
         self.pipeline = pipeline
         self.sync_file = None
-        # Set the temp directory to be output dir
+        self.upload_timeout = upload_timeout
         os.makedirs(
             os.path.join(tempfile.gettempdir(), "raga_temp", "backup"), exist_ok=True
         )
@@ -63,11 +65,9 @@ class FileSpanExporter(SpanExporter):
 
         self.filename = os.path.join(self.dir_name, trace_id + ".jsonl")
 
-        # add the ids
         self.metadata["id"] = get_unique_key(self.metadata)
         self.pipeline["id"] = get_unique_key(self.pipeline)
 
-        # add prompt id to each trace in trace_list
         for t in traces_list:
             t["prompt_id"] = get_unique_key(t)
 
@@ -100,10 +100,8 @@ class FileSpanExporter(SpanExporter):
                 json_data = [export_data]
                 json.dump(json_data, f)
                 if self.sync_file is not None:
-                    # self._upload_task = self._run_async(self._upload_traces(json_file_path= self.sync_file))
                     self._run_async(self._upload_traces(json_file_path=self.sync_file))
                 self.sync_file = json_file_path
-        # asyncio.run(self.server_upload(json_file_path)
 
 
     def _run_async(self, coroutine):
