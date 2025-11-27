@@ -510,7 +510,7 @@ class PromptManager:
         Returns:
             List of model names, empty list on failure
         """
-        models_url = f"{RagaAICatalyst.BASE_URL}/v1/llm/models"
+        models_url = f"{RagaAICatalyst.BASE_URL}/playground/providers/models/list"
         response = self._make_api_request("POST", models_url, json={"providerName": provider_name})
         
         if response:
@@ -600,6 +600,7 @@ class PromptManager:
             logger.info(f"No message provided, auto-generated: {message}")
 
         self._validate_text_fields(text_fields)
+        model = model.lower()
         provider_name, model_name = self._validate_and_parse_model(model)
 
         if metrics_specs is None:
@@ -759,7 +760,6 @@ class PromptManager:
                 f"Supported providers: {', '.join(sorted([p.rstrip('/') for p in self.VALID_MODEL_PREFIXES]))}"
             )
 
-        model = model.lower()
         if not any(model.startswith(prefix) for prefix in self.VALID_MODEL_PREFIXES):
             raise ValueError(
                 f"Unsupported model provider in '{model}'. "
