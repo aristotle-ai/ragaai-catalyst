@@ -22,7 +22,6 @@ class DynamicTraceExporter(SpanExporter):
             base_url: str,
             tracer_type: str,
             files_to_zip: Optional[List[str]] = None,
-            project_id: Optional[str] = None,
             user_details: Optional[Dict] = None,
             custom_model_cost: Optional[dict] = None,
             timeout: int = 120,
@@ -52,7 +51,6 @@ class DynamicTraceExporter(SpanExporter):
             base_url=base_url,
             tracer_type=tracer_type,
             files_to_zip=files_to_zip,
-            project_id=project_id,
             user_details=user_details,
             custom_model_cost=custom_model_cost,
             timeout=timeout,
@@ -65,7 +63,6 @@ class DynamicTraceExporter(SpanExporter):
 
         self._files_to_zip = files_to_zip
         self._project_name = project_name
-        self._project_id = project_id
         self._dataset_name = dataset_name
         self._user_details = user_details
         self._base_url = base_url
@@ -119,7 +116,6 @@ class DynamicTraceExporter(SpanExporter):
         """
         self._exporter.files_to_zip = self._files_to_zip
         self._exporter.project_name = self._project_name
-        self._exporter.project_id = self._project_id
         self._exporter.dataset_name = self._dataset_name
         self._exporter.user_details = self._user_details
         self._exporter.base_url = self._base_url
@@ -146,14 +142,6 @@ class DynamicTraceExporter(SpanExporter):
     @project_name.setter
     def project_name(self, value):
         self._project_name = value
-
-    @property
-    def project_id(self):
-        return self._project_id
-
-    @project_id.setter
-    def project_id(self, value):
-        self._project_id = value
 
     @property
     def dataset_name(self):

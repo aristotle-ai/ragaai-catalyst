@@ -57,7 +57,6 @@ class RAGATraceExporter(SpanExporter):
             base_url: str,
             tracer_type: str,
             files_to_zip: Optional[List[str]] = None,
-            project_id: Optional[str] = None,
             user_details: Optional[Dict] = None,
             custom_model_cost: Optional[dict] = None,
             timeout: int = 120,
@@ -92,7 +91,6 @@ class RAGATraceExporter(SpanExporter):
         self.tracer_type = tracer_type
         self.files_to_zip = files_to_zip
         self.project_name = project_name
-        self.project_id = project_id
         self.dataset_name = dataset_name
         self.user_details = user_details
         self.base_url = base_url
@@ -283,7 +281,6 @@ class RAGATraceExporter(SpanExporter):
             'hash_id': ragaai_trace_details['hash_id'],
             'zip_path': ragaai_trace_details['code_zip_path'],
             'project_name': self.project_name,
-            'project_id': self.project_id,
             'dataset_name': self.dataset_name,
             'user_details': self.user_details,
             'base_url': self.base_url,

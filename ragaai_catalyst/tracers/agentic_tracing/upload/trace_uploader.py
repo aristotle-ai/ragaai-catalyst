@@ -77,7 +77,6 @@ class UploadTask:
     hash_id: str
     zip_path: str
     project_name: str
-    project_id: str
     dataset_name: str
     user_details: Dict[str, Any]
     base_url: str
@@ -421,7 +420,6 @@ class TraceUploader(AbstractTraceUploader):
             hash_id=trace_data.get('hash_id', ''),
             zip_path=trace_data.get('zip_path', ''),
             project_name=trace_data['project_name'],
-            project_id=trace_data['project_id'],
             dataset_name=trace_data['dataset_name'],
             user_details=trace_data['user_details'],
             base_url=trace_data['base_url'],
