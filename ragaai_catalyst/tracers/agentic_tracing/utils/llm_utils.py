@@ -375,7 +375,7 @@ def calculate_llm_cost(token_usage, model_name, model_costs, model_custom_cost=N
         }
 
     # Get model costs, defaulting to default costs if unknown
-    model_cost = model_cost = model_costs.get(
+    model_cost = model_costs.get(
         model_name, {"input_cost_per_token": 0.0, "output_cost_per_token": 0.0}
     )
     if (
