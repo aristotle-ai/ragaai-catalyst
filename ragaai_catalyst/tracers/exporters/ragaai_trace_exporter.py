@@ -3,13 +3,12 @@ import logging
 import os
 import tempfile
 from dataclasses import asdict
+from datetime import datetime
 from typing import Optional, Callable, Dict, List
 
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 
-from ragaai_catalyst.tracers.agentic_tracing.upload.trace_uploader import (
-    submit_upload_task,
-)
+from ragaai_catalyst.tracers.agentic_tracing.upload.uploader import AbstractTraceUploader
 from ragaai_catalyst.tracers.agentic_tracing.utils.system_monitor import SystemMonitor
 from ragaai_catalyst.tracers.agentic_tracing.utils.trace_utils import (
     format_interactions,
@@ -66,9 +65,14 @@ class RAGATraceExporter(SpanExporter):
             max_upload_workers: int = 30,
             user_context: Optional[str] = None,
             user_gt: Optional[str] = None,
-            external_id: Optional[str] = None
+            external_id: Optional[str] = None,
+            uploader: Optional[AbstractTraceUploader] = None
     ):
         self.trace_spans = dict()
+        if uploader is None:
+            from ragaai_catalyst.tracers.agentic_tracing.upload.trace_uploader import TraceUploader
+            uploader = TraceUploader.get_instance()
+        self.uploader = uploader
         # Use custom trace directory if environment variable is set, otherwise use temp directory
         custom_dir = os.getenv("RAGAAI_TRACE_DIR")
         if custom_dir:
@@ -134,32 +138,28 @@ class RAGATraceExporter(SpanExporter):
         return SpanExportResult.SUCCESS
 
     def shutdown(self):
-        # Process any remaining traces during shutdown
         logger.debug("Reached shutdown of exporter")
         for trace_id, spans in self.trace_spans.items():
             self.process_complete_trace(spans, trace_id)
         self.trace_spans.clear()
 
     def process_complete_trace(self, spans, trace_id):
-        # Convert the trace to ragaai trace format
         try:
             ragaai_trace_details = self.prepare_trace(spans, trace_id)
         except Exception as e:
-            print(f"Error converting trace {trace_id}: {e}")
-            return  # Exit early if conversion fails
+            logger.error(f"Error converting trace {trace_id}: {e}")
+            return
 
-        # Check if trace details are None (conversion failed)
         if ragaai_trace_details is None:
             logger.error(f"Cannot upload trace {trace_id}: conversion failed and returned None")
-            return  # Exit early if conversion failed
+            return
 
-        # Upload the trace if upload_trace function is provided
         try:
             if self.post_processor != None:
                 ragaai_trace_details['trace_file_path'] = self.post_processor(ragaai_trace_details['trace_file_path'])
             self.upload_trace(ragaai_trace_details, trace_id)
         except Exception as e:
-            print(f"Error uploading trace {trace_id}: {e}")
+            logger.error(f"Error uploading trace {trace_id}: {e}")
 
     def prepare_trace(self, spans, trace_id):
         try:
@@ -188,14 +188,14 @@ class RAGATraceExporter(SpanExporter):
                     external_id_from_spans if external_id_from_spans else self.external_id,
                 )
             except Exception as e:
-                print(f"Error in convert_json_format function: {trace_id}: {e}")
+                logger.error(f"Error in convert_json_format function: {trace_id}: {e}")
                 return None
 
             try:
                 interactions = format_interactions(ragaai_trace)
                 ragaai_trace["workflow"] = interactions['workflow']
             except Exception as e:
-                print(f"Error in format_interactions function: {trace_id}: {e}")
+                logger.error(f"Error in format_interactions function: {trace_id}: {e}")
                 return None
 
             try:
@@ -204,40 +204,40 @@ class RAGATraceExporter(SpanExporter):
                     self.files_to_zip, output_dir=self.tmp_dir
                 )
             except Exception as e:
-                print(f"Error in zip_list_of_unique_files function: {trace_id}: {e}")
+                logger.error(f"Error in zip_list_of_unique_files function: {trace_id}: {e}")
                 return None
 
             try:
                 ragaai_trace["metadata"]["system_info"] = asdict(self.system_monitor.get_system_info())
                 ragaai_trace["metadata"]["resources"] = asdict(self.system_monitor.get_resources())
             except Exception as e:
-                print(f"Error in get_system_info or get_resources function: {trace_id}: {e}")
+                logger.error(f"Error in get_system_info or get_resources function: {trace_id}: {e}")
                 return None
 
             try:
                 ragaai_trace["metadata"]["system_info"]["source_code"] = hash_id
             except Exception as e:
-                print(f"Error in adding source code hash: {trace_id}: {e}")
+                logger.error(f"Error in adding source code hash: {trace_id}: {e}")
                 return None
 
             try:
                 ragaai_trace["data"][0]["start_time"] = ragaai_trace["start_time"]
                 ragaai_trace["data"][0]["end_time"] = ragaai_trace["end_time"]
             except Exception as e:
-                print(f"Error in adding start_time or end_time: {trace_id}: {e}")
+                logger.error(f"Error in adding start_time or end_time: {trace_id}: {e}")
                 return None
 
             try:
                 ragaai_trace["project_name"] = self.project_name
             except Exception as e:
-                print(f"Error in adding project name: {trace_id}: {e}")
+                logger.error(f"Error in adding project name: {trace_id}: {e}")
                 return None
 
             try:
                 # Add tracer type to the trace
                 ragaai_trace["tracer_type"] = self.tracer_type
             except Exception as e:
-                print(f"Error in adding tracer type: {trace_id}: {e}")
+                logger.error(f"Error in adding tracer type: {trace_id}: {e}")
                 return None
 
             # Add user passed metadata to the trace
@@ -256,7 +256,7 @@ class RAGATraceExporter(SpanExporter):
 
                 logger.debug("Completed adding user passed metadata")
             except Exception as e:
-                print(f"Error in adding metadata: {trace_id}: {e}")
+                logger.error(f"Error in adding metadata: {trace_id}: {e}")
                 return None
 
             try:
@@ -265,7 +265,7 @@ class RAGATraceExporter(SpanExporter):
                 with open(trace_file_path, "w") as file:
                     json.dump(ragaai_trace, file, cls=TracerJSONEncoder, indent=2)
             except Exception as e:
-                print(f"Error in saving trace json: {trace_id}: {e}")
+                logger.error(f"Error in saving trace json: {trace_id}: {e}")
                 return None
 
             return {
@@ -274,24 +274,22 @@ class RAGATraceExporter(SpanExporter):
                 'hash_id': hash_id
             }
         except Exception as e:
-            print(f"Error converting trace {trace_id}: {str(e)}")
+            logger.error(f"Error converting trace {trace_id}: {str(e)}")
             return None
 
     def upload_trace(self, ragaai_trace_details, trace_id):
-        filepath = ragaai_trace_details['trace_file_path']
-        hash_id = ragaai_trace_details['hash_id']
-        zip_path = ragaai_trace_details['code_zip_path']
-        self.upload_task_id = submit_upload_task(
-            filepath=filepath,
-            hash_id=hash_id,
-            zip_path=zip_path,
-            project_name=self.project_name,
-            project_id=self.project_id,
-            dataset_name=self.dataset_name,
-            user_details=self.user_details,
-            base_url=self.base_url,
-            tracer_type=self.tracer_type,
-            timeout=self.timeout
-        )
+        trace_data = {
+            'filepath': ragaai_trace_details['trace_file_path'],
+            'hash_id': ragaai_trace_details['hash_id'],
+            'zip_path': ragaai_trace_details['code_zip_path'],
+            'project_name': self.project_name,
+            'project_id': self.project_id,
+            'dataset_name': self.dataset_name,
+            'user_details': self.user_details,
+            'base_url': self.base_url,
+            'tracer_type': self.tracer_type,
+            'timeout': self.timeout
+        }
+        self.upload_task_id = self.uploader.submit(trace_data)
 
         logger.info(f"Submitted upload task with ID: {self.upload_task_id}")

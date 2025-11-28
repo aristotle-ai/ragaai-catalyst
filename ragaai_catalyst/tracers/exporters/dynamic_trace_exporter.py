@@ -63,7 +63,6 @@ class DynamicTraceExporter(SpanExporter):
             external_id=external_id
         )
 
-        # Store the initial values
         self._files_to_zip = files_to_zip
         self._project_name = project_name
         self._project_id = project_id
@@ -89,13 +88,11 @@ class DynamicTraceExporter(SpanExporter):
             SpanExportResult: Result of the export operation
         """
         try:
-            # Update the exporter's properties
             self._update_exporter_properties()
         except Exception as e:
             logger.error(f"Error updating exporter properties: {e}")
 
         try:
-            # Forward the call to the underlying exporter
             result = self._exporter.export(spans)
             return result
         except Exception as e:
@@ -107,13 +104,11 @@ class DynamicTraceExporter(SpanExporter):
         Before shutting down, update the exporter's properties with the current values.
         """
         try:
-            # Update the exporter's properties
             self._update_exporter_properties()
         except Exception as e:
             logger.error(f"Error updating exporter properties: {e}")
 
         try:
-            # Forward the call to the underlying exporter
             return self._exporter.shutdown()
         except Exception as e:
             logger.error(f"Error shutting down exporter: {e}")
@@ -135,7 +130,6 @@ class DynamicTraceExporter(SpanExporter):
         self._exporter.user_gt = self._user_gt
         self._exporter.external_id = self._external_id
 
-    # Getter and setter methods for dynamic properties
 
     @property
     def files_to_zip(self):
