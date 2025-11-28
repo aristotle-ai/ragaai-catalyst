@@ -3,6 +3,7 @@ import logging
 import os
 import tempfile
 from dataclasses import asdict
+from datetime import datetime
 from typing import Optional, Callable, Dict, List
 
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
@@ -113,8 +114,8 @@ class RAGATraceExporter(SpanExporter):
                 if span_json.get("attributes").get("openinference.span.kind", None) is None:
                     span_json["attributes"]["openinference.span.kind"] = "UNKNOWN"
 
-                # Extract dataset name from span attributes for proper isolation
-                dataset_name = self._get_dataset_from_span(span_json)
+                # Extract dataset name from span attributes for proper isolation, fallback to default if not found
+                dataset_name = self._get_dataset_from_span(span_json) or self.dataset_name
 
                 # Create composite key (dataset_name, trace_id) for proper isolation
                 trace_key = (dataset_name, trace_id)
@@ -127,7 +128,7 @@ class RAGATraceExporter(SpanExporter):
                 if span_json["parent_id"] is None:
                     trace = self.trace_spans[trace_key]
                     try:
-                        self.process_complete_trace(trace, trace_id, dataset_name)
+                        self.process_complete_trace(trace, trace_id)
                     except Exception as e:
                         logger.error(f"Error processing complete trace: {e}")
                     try:
@@ -148,69 +149,49 @@ class RAGATraceExporter(SpanExporter):
             span_json: Single span dictionary
             
         Returns:
-            str: Dataset name if found, fallback to original dataset_name otherwise
+            str: Dataset name if found, None otherwise
         """
         try:
-            attributes = span_json.get('attributes', {})
-            dataset = attributes.get('ragaai.dataset')
-
+            dataset = span_json.get("attributes", {}).get("ragaai.dataset")
+            
             if dataset:
                 logger.debug(f"Found dataset '{dataset}' in span: {span_json.get('name', 'unnamed')}")
                 return dataset
-            else:
-                # Fallback to original dataset if ragaai.dataset not found
-                logger.debug(f"No ragaai.dataset found in span: {span_json.get('name', 'unnamed')}, using fallback: {self.dataset_name}")
-                return self.dataset_name
+            
+            logger.debug(f"No ragaai.dataset found in span: {span_json.get('name', 'unnamed')}")
+            return None
 
         except Exception as e:
             logger.error(f"Error extracting dataset from span: {e}")
-            return self.dataset_name
+            return None
 
     def shutdown(self):
         # Process any remaining traces during shutdown
         logger.debug("Reached shutdown of exporter")
         for trace_key, spans in self.trace_spans.items():
-            dataset_name, trace_id = trace_key  # Unpack the composite key
-            self.process_complete_trace(spans, trace_id, dataset_name)
+            _, trace_id = trace_key  # Unpack the composite key
+            self.process_complete_trace(spans, trace_id)
         self.trace_spans.clear()
 
-    def process_complete_trace(self, spans, trace_id, dataset_name=None):
+    def process_complete_trace(self, spans, trace_id):
         """
         Process a complete trace with the specified dataset.
         
         Args:
             spans: List of span dictionaries for this trace
             trace_id: The trace ID
-            dataset_name: The dataset name for this trace (from span attributes)
         """
-        # Use the dataset name from span attributes if provided, otherwise fall back to detection
-        if dataset_name is None:
-            dataset_name = self._get_dataset_from_spans(spans)
-
-        if dataset_name and dataset_name != self.dataset_name:
-            # Temporarily route to the target dataset
-            logger.info(f"Routing trace {trace_id} to dataset: {dataset_name}")
-
-            # Store original values
-            original_dataset = self.dataset_name
-            original_user_details = self.user_details.copy()
-
-            try:
-                # Update dataset for this trace
-                self.dataset_name = dataset_name
-                self.user_details["dataset_name"] = dataset_name
-
-                # Process with updated dataset
-                self._process_trace_with_current_dataset(spans, trace_id, self.dataset_name)
-
-            finally:
-                # Restore original values
-                self.dataset_name = original_dataset
-                self.user_details = original_user_details
+        # Extract dataset from span attributes, fallback to default if not found
+        dataset_name = self._get_dataset_from_spans(spans) or self.dataset_name
+        
+        # Log which dataset is being used
+        if dataset_name != self.dataset_name:
+            logger.info(f"Routing trace {trace_id} to dataset: {dataset_name} (default: {self.dataset_name})")
         else:
-            # Use original dataset
-            logger.debug(f"Trace {trace_id} using original dataset: {self.dataset_name}")
-            self._process_trace_with_current_dataset(spans, trace_id, self.dataset_name)
+            logger.debug(f"Trace {trace_id} using default dataset: {self.dataset_name}")
+        
+        # Process trace with the determined dataset (no state mutation needed)
+        self._process_trace_with_current_dataset(spans, trace_id, dataset_name)
 
     def _process_trace_with_current_dataset(self, spans, trace_id, dataset_name):
         """
@@ -249,14 +230,12 @@ class RAGATraceExporter(SpanExporter):
         try:
             # Look through all spans for the ragaai.dataset attribute
             for span in spans:
-                attributes = span.get('attributes', {})
-                dataset = attributes.get('ragaai.dataset')
-
+                dataset = span.get('attributes', {}).get('ragaai.dataset')
+                
                 if dataset:
                     logger.debug(f"Found dataset '{dataset}' in span: {span.get('name', 'unnamed')}")
                     return dataset
 
-            # No dataset attribute found
             logger.debug("No ragaai.dataset attribute found in any span")
             return None
 

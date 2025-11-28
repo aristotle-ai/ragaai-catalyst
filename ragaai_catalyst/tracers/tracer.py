@@ -464,11 +464,6 @@ class Tracer(AgenticTracing):
         self.dynamic_exporter.dataset_name = dataset_name
         logger.debug(f"Updated dynamic exporter's dataset_name to {dataset_name}")
 
-        # Update the tracer's own dataset_name (fallback)
-        self.dataset_name = dataset_name
-
-        logger.debug(f"Dataset name set via context variables for request-level isolation")
-
     def _improve_metadata(self, metadata, tracer_type):
         if metadata is None:
             metadata = {}
