@@ -166,7 +166,7 @@ class GuardExecutor:
     def execute_input_guardrails(self, prompt, prompt_params):
         doc = self.set_variables(prompt,prompt_params)
         deployment_response = self.execute_deployment(self.input_deployment_id,doc)
-        trace_id = deployment_response['data']['results'][0]['executionId']
+        trace_id = deployment_response['data']['traceId']
         self.id_2_doc[trace_id] = doc
         if deployment_response and deployment_response['data']['status'].lower() == 'fail':
             return deployment_response['data']['alternateResponse'], deployment_response
