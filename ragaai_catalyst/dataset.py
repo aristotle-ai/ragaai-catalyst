@@ -564,8 +564,10 @@ class Dataset:
             add_column_payload = {
                 "rowFilterList": [],
                 "columnName": column_name,
+                "addColumnType": "RUN_PROMPT",
                 "datasetId": dataset_id,
                 "variables": variables,
+                "promptDetails": {},
                 "promptTemplate": {
                     "textFields": text_fields,
                     "modelSpecs": {
