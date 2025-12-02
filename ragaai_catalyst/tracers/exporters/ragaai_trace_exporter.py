@@ -4,7 +4,7 @@ import os
 import tempfile
 from dataclasses import asdict
 from datetime import datetime
-from typing import Optional, Callable, Dict, List
+from typing import Any, Optional, Callable, Dict, List, Sequence
 
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 
@@ -27,7 +27,7 @@ logging_level = (
 
 
 class TracerJSONEncoder(json.JSONEncoder):
-    def default(self, obj):
+    def default(self, obj: Any) -> Any:
         if isinstance(obj, datetime):
             return obj.isoformat()
         if isinstance(obj, bytes):
@@ -131,7 +131,7 @@ class RAGATraceExporter(SpanExporter):
 
         return SpanExportResult.SUCCESS
 
-    def _get_dataset_from_span(self, span_json):
+    def _get_dataset_from_span(self, span_json: Dict[str, Any]) -> Optional[str]:
         try:
             dataset = span_json.get("attributes", {}).get("ragaai.dataset")
             
@@ -146,18 +146,18 @@ class RAGATraceExporter(SpanExporter):
             logger.error(f"Error extracting dataset from span: {e}")
             return None
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         logger.debug("Reached shutdown of exporter")
         for trace_id, spans in self.trace_spans.items():
             self.process_complete_trace(spans, trace_id)
         self.trace_spans.clear()
 
-    def process_complete_trace(self, spans, trace_id):
+    def process_complete_trace(self, spans: List[Dict[str, Any]], trace_id: str) -> None:
         self.dataset_name = self._get_dataset_from_spans(spans)
         
         self._process_trace_with_current_dataset(spans, trace_id, self.dataset_name)
 
-    def _process_trace_with_current_dataset(self, spans, trace_id, dataset_name):
+    def _process_trace_with_current_dataset(self, spans: List[Dict[str, Any]], trace_id: str, dataset_name: Optional[str]) -> None:
         try:
             ragaai_trace_details = self.prepare_trace(spans, trace_id)
         except Exception as e:
@@ -175,7 +175,7 @@ class RAGATraceExporter(SpanExporter):
         except Exception as e:
             print(f"Error uploading trace {trace_id}: {e}")
 
-    def _get_dataset_from_spans(self, spans):
+    def _get_dataset_from_spans(self, spans: List[Dict[str, Any]]) -> Optional[str]:
         try:
             for span in spans:
                 dataset = span.get('attributes', {}).get('ragaai.dataset')
@@ -191,7 +191,7 @@ class RAGATraceExporter(SpanExporter):
             logger.error(f"Error extracting dataset from spans: {e}")
             return None
     
-    def prepare_trace(self, spans, trace_id):
+    def prepare_trace(self, spans: List[Dict[str, Any]], trace_id: str) -> Optional[Dict[str, Any]]:
         try:
             external_id_from_spans = None
             try:
@@ -302,7 +302,7 @@ class RAGATraceExporter(SpanExporter):
             print(f"Error converting trace {trace_id}: {str(e)}")
             return None
 
-    def upload_trace(self, ragaai_trace_details, trace_id, dataset_name):
+    def upload_trace(self, ragaai_trace_details: Dict[str, Any], trace_id: str, dataset_name: Optional[str]) -> None:
         filepath = ragaai_trace_details['trace_file_path']
         hash_id = ragaai_trace_details['hash_id']
         zip_path = ragaai_trace_details['code_zip_path']
