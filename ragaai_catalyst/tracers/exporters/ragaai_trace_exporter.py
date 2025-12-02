@@ -153,9 +153,14 @@ class RAGATraceExporter(SpanExporter):
         self.trace_spans.clear()
 
     def process_complete_trace(self, spans: List[Dict[str, Any]], trace_id: str) -> None:
-        self.dataset_name = self._get_dataset_from_spans(spans)
-        
-        self._process_trace_with_current_dataset(spans, trace_id, self.dataset_name)
+        dataset_name = self._get_dataset_from_spans(spans) or self.dataset_name
+
+        if dataset_name != self.dataset_name:
+            logger.info(f"Routing trace {trace_id} to dataset: {dataset_name} (default: {self.dataset_name})")
+        else:
+            logger.debug(f"Trace {trace_id} using default dataset: {self.dataset_name}")
+
+        self._process_trace_with_current_dataset(spans, trace_id, dataset_name)
 
     def _process_trace_with_current_dataset(self, spans: List[Dict[str, Any]], trace_id: str, dataset_name: Optional[str]) -> None:
         try:
