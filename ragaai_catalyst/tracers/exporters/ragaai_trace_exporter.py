@@ -3,7 +3,8 @@ import logging
 import os
 import tempfile
 from dataclasses import asdict
-from typing import Optional, Callable, Dict, List
+from datetime import datetime
+from typing import Any, Optional, Callable, Dict, List, Sequence
 
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 
@@ -26,28 +27,26 @@ logging_level = (
 
 
 class TracerJSONEncoder(json.JSONEncoder):
-    def default(self, obj):
+    def default(self, obj: Any) -> Any:
         if isinstance(obj, datetime):
             return obj.isoformat()
         if isinstance(obj, bytes):
             try:
                 return obj.decode("utf-8")
             except UnicodeDecodeError:
-                return str(obj)  # Fallback to string representation
-        if hasattr(obj, "to_dict"):  # Handle objects with to_dict method
+                return str(obj)
+        if hasattr(obj, "to_dict"):
             return obj.to_dict()
         if hasattr(obj, "__dict__"):
-            # Filter out None values and handle nested serialization
             return {
                 k: v
                 for k, v in obj.__dict__.items()
                 if v is not None and not k.startswith("_")
             }
         try:
-            # Try to convert to a basic type
             return str(obj)
         except:
-            return None  # Last resort: return None instead of failing
+            return None
 
 
 class RAGATraceExporter(SpanExporter):
@@ -69,11 +68,9 @@ class RAGATraceExporter(SpanExporter):
             external_id: Optional[str] = None
     ):
         self.trace_spans = dict()
-        # Use custom trace directory if environment variable is set, otherwise use temp directory
         custom_dir = os.getenv("RAGAAI_TRACE_DIR")
         if custom_dir:
             try:
-                # Create the directory if it doesn't exist
                 os.makedirs(custom_dir, exist_ok=True)
                 self.tmp_dir = custom_dir
                 logger.info(f"Using custom trace directory: {custom_dir}")
@@ -108,15 +105,16 @@ class RAGATraceExporter(SpanExporter):
                 trace_id = span_json.get("context").get("trace_id")
                 if trace_id is None:
                     logger.error("Trace ID is None")
-
-                if trace_id not in self.trace_spans:
-                    self.trace_spans[trace_id] = list()
+                    continue
 
                 if span_json.get("attributes").get("openinference.span.kind", None) is None:
                     span_json["attributes"]["openinference.span.kind"] = "UNKNOWN"
 
-                self.trace_spans[trace_id].append(span_json)
+                if trace_id not in self.trace_spans:
+                    self.trace_spans[trace_id] = list()
 
+                self.trace_spans[trace_id].append(span_json)
+                
                 if span_json["parent_id"] is None:
                     trace = self.trace_spans[trace_id]
                     try:
@@ -133,37 +131,73 @@ class RAGATraceExporter(SpanExporter):
 
         return SpanExportResult.SUCCESS
 
-    def shutdown(self):
-        # Process any remaining traces during shutdown
+    def _get_dataset_from_span(self, span_json: Dict[str, Any]) -> Optional[str]:
+        try:
+            dataset = span_json.get("attributes", {}).get("ragaai.dataset")
+            
+            if dataset:
+                logger.debug(f"Found dataset '{dataset}' in span: {span_json.get('name', 'unnamed')}")
+                return dataset
+            
+            logger.debug(f"No ragaai.dataset found in span: {span_json.get('name', 'unnamed')}")
+            return None
+
+        except Exception as e:
+            logger.error(f"Error extracting dataset from span: {e}")
+            return None
+
+    def shutdown(self) -> None:
         logger.debug("Reached shutdown of exporter")
         for trace_id, spans in self.trace_spans.items():
             self.process_complete_trace(spans, trace_id)
         self.trace_spans.clear()
 
-    def process_complete_trace(self, spans, trace_id):
-        # Convert the trace to ragaai trace format
+    def process_complete_trace(self, spans: List[Dict[str, Any]], trace_id: str) -> None:
+        dataset_name = self._get_dataset_from_spans(spans) or self.dataset_name
+
+        if dataset_name != self.dataset_name:
+            logger.info(f"Routing trace {trace_id} to dataset: {dataset_name} (default: {self.dataset_name})")
+        else:
+            logger.debug(f"Trace {trace_id} using default dataset: {self.dataset_name}")
+
+        self._process_trace_with_current_dataset(spans, trace_id, dataset_name)
+
+    def _process_trace_with_current_dataset(self, spans: List[Dict[str, Any]], trace_id: str, dataset_name: Optional[str]) -> None:
         try:
             ragaai_trace_details = self.prepare_trace(spans, trace_id)
         except Exception as e:
             print(f"Error converting trace {trace_id}: {e}")
-            return  # Exit early if conversion fails
+            return
 
-        # Check if trace details are None (conversion failed)
         if ragaai_trace_details is None:
             logger.error(f"Cannot upload trace {trace_id}: conversion failed and returned None")
-            return  # Exit early if conversion failed
+            return
 
-        # Upload the trace if upload_trace function is provided
         try:
             if self.post_processor != None:
                 ragaai_trace_details['trace_file_path'] = self.post_processor(ragaai_trace_details['trace_file_path'])
-            self.upload_trace(ragaai_trace_details, trace_id)
+            self.upload_trace(ragaai_trace_details, trace_id, dataset_name)
         except Exception as e:
             print(f"Error uploading trace {trace_id}: {e}")
 
-    def prepare_trace(self, spans, trace_id):
+    def _get_dataset_from_spans(self, spans: List[Dict[str, Any]]) -> Optional[str]:
         try:
-            # Extract external_id from spans via OpenInference user.id (prefer root span)
+            for span in spans:
+                dataset = span.get('attributes', {}).get('ragaai.dataset')
+                
+                if dataset:
+                    logger.debug(f"Found dataset '{dataset}' in span: {span.get('name', 'unnamed')}")
+                    return dataset
+
+            logger.debug("No ragaai.dataset attribute found in any span")
+            return None
+
+        except Exception as e:
+            logger.error(f"Error extracting dataset from spans: {e}")
+            return None
+    
+    def prepare_trace(self, spans: List[Dict[str, Any]], trace_id: str) -> Optional[Dict[str, Any]]:
+        try:
             external_id_from_spans = None
             try:
                 root_span = next((s for s in spans if s.get("parent_id") is None), None)
@@ -199,7 +233,6 @@ class RAGATraceExporter(SpanExporter):
                 return None
 
             try:
-                # Add source code hash
                 hash_id, zip_path = zip_list_of_unique_files(
                     self.files_to_zip, output_dir=self.tmp_dir
                 )
@@ -234,13 +267,11 @@ class RAGATraceExporter(SpanExporter):
                 return None
 
             try:
-                # Add tracer type to the trace
                 ragaai_trace["tracer_type"] = self.tracer_type
             except Exception as e:
                 print(f"Error in adding tracer type: {trace_id}: {e}")
                 return None
 
-            # Add user passed metadata to the trace
             try:
                 logger.debug("Started adding user passed metadata")
 
@@ -260,7 +291,6 @@ class RAGATraceExporter(SpanExporter):
                 return None
 
             try:
-                # Save the trace_json 
                 trace_file_path = os.path.join(self.tmp_dir, f"{trace_id}.json")
                 with open(trace_file_path, "w") as file:
                     json.dump(ragaai_trace, file, cls=TracerJSONEncoder, indent=2)
@@ -277,7 +307,7 @@ class RAGATraceExporter(SpanExporter):
             print(f"Error converting trace {trace_id}: {str(e)}")
             return None
 
-    def upload_trace(self, ragaai_trace_details, trace_id):
+    def upload_trace(self, ragaai_trace_details: Dict[str, Any], trace_id: str, dataset_name: Optional[str]) -> None:
         filepath = ragaai_trace_details['trace_file_path']
         hash_id = ragaai_trace_details['hash_id']
         zip_path = ragaai_trace_details['code_zip_path']
@@ -287,7 +317,7 @@ class RAGATraceExporter(SpanExporter):
             zip_path=zip_path,
             project_name=self.project_name,
             project_id=self.project_id,
-            dataset_name=self.dataset_name,
+            dataset_name=dataset_name,
             user_details=self.user_details,
             base_url=self.base_url,
             tracer_type=self.tracer_type,

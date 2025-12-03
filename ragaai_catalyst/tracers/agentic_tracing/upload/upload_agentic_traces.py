@@ -21,7 +21,6 @@ class UploadAgenticTraces:
         project_name,
         project_id,
         dataset_name,
-        user_detail,
         base_url,
         timeout=120,
     ):
@@ -29,7 +28,6 @@ class UploadAgenticTraces:
         self.project_name = project_name
         self.project_id = project_id
         self.dataset_name = dataset_name
-        self.user_detail = user_detail
         self.base_url = base_url
         self.timeout = timeout
 
