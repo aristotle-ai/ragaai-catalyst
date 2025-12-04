@@ -30,6 +30,9 @@ class TraceAPIClient:
     - get_code_presigned_url()
     - upload_zip_to_presigned_url()
     - insert_code_metadata()
+    - get_project_id()
+    - validate_project()
+    - list_all_projects()
     
     PRIVATE API (internal use only):
     - _get_headers()
@@ -41,6 +44,7 @@ class TraceAPIClient:
     - Request retries and error handling
     - Response parsing and validation
     - Presigned URL management
+    - Project validation and fetching
     """
     
     def __init__(self, base_url: str, project_name: str, timeout: int = 120):
@@ -107,7 +111,9 @@ class TraceAPIClient:
                 return response
             elif response.status_code == 401 and retry_on_401:
                 logger.warning("Received 401 error. Attempting to refresh token.")
-                self.catalyst.get_token(force_refresh=True)
+                # Use AuthManager for token refresh
+                from ragaai_catalyst.auth_manager import AuthManager
+                AuthManager.get_token(force_refresh=True)
                 headers["Authorization"] = f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}"
                 return self._make_request(method, endpoint, data, headers, retry_on_401=False)
             else:
@@ -378,4 +384,66 @@ class TraceAPIClient:
         
         response = self._make_request("POST", "/v2/llm/dataset/code", data=payload)
         return response
-
+    
+    def get_project_id(self, project_name: Optional[str] = None) -> Optional[str]:
+        """
+        Get project ID for a given project name.
+        
+        Args:
+            project_name: Name of the project (defaults to self.project_name)
+            
+        Returns:
+            Project ID string or None if not found
+        """
+        name = project_name or self.project_name
+        response = self._make_request("GET", "/v2/llm/projects?size=99999")
+        
+        if response:
+            try:
+                projects = response.json()["data"]["content"]
+                for project in projects:
+                    if project["name"] == name:
+                        logger.debug(f"Found project '{name}' with ID: {project['id']}")
+                        return project["id"]
+                logger.error(f"Project '{name}' not found in project list")
+                return None
+            except (KeyError, IndexError) as e:
+                logger.error(f"Failed to parse projects from response: {e}")
+                return None
+        
+        logger.error("Failed to fetch projects")
+        return None
+    
+    def validate_project(self, project_name: Optional[str] = None) -> bool:
+        """
+        Validate that a project exists.
+        
+        Args:
+            project_name: Name of the project (defaults to self.project_name)
+            
+        Returns:
+            True if project exists, False otherwise
+        """
+        project_id = self.get_project_id(project_name)
+        return project_id is not None
+    
+    def list_all_projects(self) -> List[Dict[str, Any]]:
+        """
+        Get list of all projects with their details.
+        
+        Returns:
+            List of project dictionaries with 'id', 'name', and other fields
+        """
+        response = self._make_request("GET", "/v2/llm/projects?size=99999")
+        
+        if response:
+            try:
+                projects = response.json()["data"]["content"]
+                logger.debug(f"Successfully fetched {len(projects)} projects")
+                return projects
+            except (KeyError, IndexError) as e:
+                logger.error(f"Failed to parse projects from response: {e}")
+                return []
+        
+        logger.error("Failed to fetch projects")
+        return []

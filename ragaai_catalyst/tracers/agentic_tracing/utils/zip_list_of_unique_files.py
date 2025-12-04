@@ -480,10 +480,3 @@ def zip_list_of_unique_files(
     tracker = TraceDependencyTracker(output_dir)
     return tracker.create_zip(filepaths)
 
-
-# # Example usage
-# if __name__ == "__main__":
-#     filepaths = ["script1.py", "script2.py"]
-#     hash_id, zip_path = zip_list_of_unique_files(filepaths)
-#     print(f"Created zip file: {zip_path}")
-#     print(f"Hash ID: {hash_id}")
