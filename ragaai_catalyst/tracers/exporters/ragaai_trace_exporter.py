@@ -195,23 +195,27 @@ class RAGATraceExporter(SpanExporter):
         except Exception as e:
             logger.error(f"Error extracting dataset from spans: {e}")
             return None
-    
+
+    def _get_external_id_from_spans(self, spans: List[Dict[str, Any]]) -> Optional[str]:
+        try:
+            root_span = next((s for s in spans if s.get("parent_id") is None), None)
+            if root_span:
+                external_id_from_spans = (
+                    json.loads(root_span.get("attributes", {}).get("metadata", {})).get("external_id")
+                )
+            if not external_id_from_spans:
+                for s in spans:
+                    external_id_from_spans = json.loads(s.get("attributes", {}).get("metadata", {})).get("external_id")
+                    if external_id_from_spans:
+                        break
+            return external_id_from_spans
+        except Exception as e:
+            logger.error(f"Error extracting external_id from spans: {e}")
+            return None
+
     def prepare_trace(self, spans: List[Dict[str, Any]], trace_id: str) -> Optional[Dict[str, Any]]:
         try:
-            external_id_from_spans = None
-            try:
-                root_span = next((s for s in spans if s.get("parent_id") is None), None)
-                if root_span:
-                    external_id_from_spans = (
-                        root_span.get("attributes", {}).get("user.id")
-                    )
-                if not external_id_from_spans:
-                    for s in spans:
-                        external_id_from_spans = s.get("attributes", {}).get("user.id")
-                        if external_id_from_spans:
-                            break
-            except Exception:
-                external_id_from_spans = None
+            external_id_from_spans = self._get_external_id_from_spans(spans)
 
             try:
                 ragaai_trace = convert_json_format(
