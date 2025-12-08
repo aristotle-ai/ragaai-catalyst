@@ -24,16 +24,16 @@ JOB_STATUS_IN_PROGRESS = "in_progress"
 JOB_STATUS_COMPLETED = "success"
 
 class Dataset:
-    BASE_URL = None
-    TIMEOUT = 30
+    _DEFAULT_TIMEOUT = 30
 
     def __init__(self, project_name: str):
         self.project_name = project_name
         self.num_projects = 99999
-        Dataset.BASE_URL = RagaAICatalyst.BASE_URL
+        self.base_url = os.getenv("RAGAAI_CATALYST_BASE_URL", "https://catalyst.raga.ai/api")
+        self.timeout = self._DEFAULT_TIMEOUT
         self.jobId = None
         self.project_id = None
-        
+
         self._initialize_project()
 
     def _make_authenticated_request(
@@ -63,7 +63,7 @@ class Dataset:
         if endpoint.startswith("http"):
             url = endpoint
         else:
-            url = f"{Dataset.BASE_URL}{endpoint}"
+            url = f"{self.base_url}{endpoint}"
 
         try:
             start_time = time.time()
@@ -331,7 +331,7 @@ class Dataset:
                     url,
                     headers=headers,
                     data=file,
-                    timeout=Dataset.TIMEOUT
+                    timeout=self.timeout
                 )
                 elapsed_ms = (time.time() - start_time) * 1000
                 logger.debug(f"API Call: [PUT] blob-storage | Status: {response.status_code} | Time: {elapsed_ms:.2f}ms")
@@ -509,7 +509,7 @@ class Dataset:
                         return JOB_STATUS_FAILED
                         
                     status = matching_job["status"]
-                    job_url = f"{Dataset.BASE_URL.removesuffix('/api')}/projects/job-status?projectId={self.project_id}"
+                    job_url = f"{self.base_url.removesuffix('/api')}/projects/job-status?projectId={self.project_id}"
                     
                     if status == "Failed":
                         logger.info("Job failed. No results to fetch.")

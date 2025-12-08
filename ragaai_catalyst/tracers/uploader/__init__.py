@@ -6,8 +6,8 @@ This package provides the abstraction and implementation for uploading traces:
 - TraceUploader: Concrete implementation with async processing, caching, and API integration
 """
 
-from ragaai_catalyst.tracers.agentic_tracing.upload.uploader import AbstractTraceUploader
-from ragaai_catalyst.tracers.agentic_tracing.upload.trace_uploader import TraceUploader
+from ragaai_catalyst.tracers.uploader.uploader import AbstractTraceUploader
+from ragaai_catalyst.tracers.uploader.trace_uploader import TraceUploader
 
 __all__ = ['AbstractTraceUploader', 'TraceUploader']
 

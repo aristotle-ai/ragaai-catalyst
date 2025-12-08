@@ -7,10 +7,22 @@ from urllib3.util.retry import Retry
 from urllib3.exceptions import PoolError, MaxRetryError, NewConnectionError
 from requests.exceptions import ConnectionError, Timeout
 from http.client import RemoteDisconnected
-from ragaai_catalyst import RagaAICatalyst
 import requests
 
 logger = logging.getLogger(__name__)
+
+
+class SessionConfig:
+    """Configuration constants for SessionManager."""
+    MAX_RETRIES = 3
+    CONNECT_RETRIES = 3
+    READ_RETRIES = 3
+    BACKOFF_FACTOR = 0.5
+    RETRY_STATUS_CODES = [500, 502, 503, 504]
+    POOL_CONNECTIONS = 5
+    POOL_MAX_SIZE = 50
+    WARMUP_CONNECTIONS = 3
+    WARMUP_TIMEOUT = 10
 
 
 class SessionManager:
@@ -38,18 +50,18 @@ class SessionManager:
         self._session = requests.Session()
 
         retry_strategy = Retry(
-            total=3,  # number of retries
-            connect=3,  # number of retries for connection-related errors
-            read=3,  # number of retries for read-related errors
-            backoff_factor=0.5,  # wait 0.5, 1, 2... seconds between retries
-            status_forcelist=[500, 502, 503, 504]  # HTTP status codes to retry on
+            total=SessionConfig.MAX_RETRIES,
+            connect=SessionConfig.CONNECT_RETRIES,
+            read=SessionConfig.READ_RETRIES,
+            backoff_factor=SessionConfig.BACKOFF_FACTOR,
+            status_forcelist=SessionConfig.RETRY_STATUS_CODES
         )
 
         adapter = HTTPAdapter(
             max_retries=retry_strategy,
-            pool_connections=5,  # number of connection pools to cache (per host)
-            pool_maxsize=50,  # maximum number of connections in each pool
-            pool_block=True  # Block/wait when pool is full rather than raising error
+            pool_connections=SessionConfig.POOL_CONNECTIONS,
+            pool_maxsize=SessionConfig.POOL_MAX_SIZE,
+            pool_block=True
         )
 
         self._session.mount("http://", adapter)
@@ -78,7 +90,7 @@ class SessionManager:
             self._initialize_session()
         return self._session
 
-    def warm_up_connections(self, base_url, num_connections=3):
+    def warm_up_connections(self, base_url, num_connections=SessionConfig.WARMUP_CONNECTIONS):
         """
         Warm up the connection pool by making lightweight requests to healthcheck endpoint.
         This can help prevent RemoteDisconnected errors on initial requests.
@@ -93,7 +105,7 @@ class SessionManager:
         for i in range(num_connections):
             try:
                 # Make a lightweight HEAD request to the healthcheck endpoint to warm up the connection
-                response = self._session.head(healthcheck_url, timeout=10)
+                response = self._session.head(healthcheck_url, timeout=SessionConfig.WARMUP_TIMEOUT)
                 logger.info(f"Warmup connection {i+1}: Status {response.status_code}")
             except Exception as e:
                 logger.warning(f"Warmup connection {i+1} failed (this may be normal): {e}")
@@ -133,7 +145,7 @@ class SessionManager:
         Make HTTP request with additional retry logic for RemoteDisconnected errors
         that may not be caught by urllib3's retry mechanism.
         """
-        max_retries = 3
+        max_retries = SessionConfig.MAX_RETRIES
         for attempt in range(max_retries):
             try:
                 response = self._session.request(method, url, **kwargs)

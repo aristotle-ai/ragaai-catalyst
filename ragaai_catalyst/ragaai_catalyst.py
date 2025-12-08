@@ -3,80 +3,81 @@ import os
 import re
 import threading
 import time
-from typing import Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import requests
 
 from ragaai_catalyst.auth_manager import AuthManager
 
 logger = logging.getLogger("RagaAICatalyst")
-logging_level = (
-    logger.setLevel(logging.DEBUG) if os.getenv("DEBUG") == "1" else logging.INFO
-)
+
+# Configure debug level if DEBUG environment variable is set
+if os.getenv("DEBUG") == "1":
+    logger.setLevel(logging.DEBUG)
 
 
 class RagaAICatalyst:
-    BASE_URL = None
-    TIMEOUT = 10  # Default timeout in seconds
-    TOKEN_EXPIRY_TIME = 6  # Default token expiration time (6 hours in hours)
+    """RagaAI Catalyst SDK client for LLM evaluation and monitoring."""
+
+    _DEFAULT_BASE_URL = "https://catalyst.raga.ai/api"
+    _DEFAULT_TIMEOUT = 10
+    
+    # Backward compatibility
+    BASE_URL = os.getenv("RAGAAI_CATALYST_BASE_URL") or _DEFAULT_BASE_URL
+    TIMEOUT = _DEFAULT_TIMEOUT
 
     def __init__(
         self,
-        access_key,
-        secret_key,
+        access_key: str,
+        secret_key: str,
         api_keys: Optional[Dict[str, str]] = None,
         base_url: Optional[str] = None,
-        token_expiry_time: Optional[float] = 6,
+        token_expiry_time: float = 6.0,
     ):
         """
-        Initializes a new instance of the RagaAICatalyst class.
+        Initialize RagaAI Catalyst client.
 
         Args:
-            access_key (str): The access key for the RagaAICatalyst.
-            secret_key (str): The secret key for the RagaAICatalyst.
-            api_keys (Optional[Dict[str, str]]): A dictionary of API keys for different services. Defaults to None.
-            base_url (Optional[str]): The base URL for the RagaAICatalyst API. Defaults to None.
-            token_expiry_time (Optional[float]): The time in hours before the token expires. Defaults to 6 hours.
+            access_key: RagaAI Catalyst access key
+            secret_key: RagaAI Catalyst secret key
+            api_keys: Optional dict of third-party API keys
+            base_url: Optional custom API base URL
+            token_expiry_time: Token expiration time in hours (default: 6)
 
         Raises:
-            ValueError: If the RAGAAI_CATALYST_ACCESS_KEY and RAGAAI_CATALYST_SECRET_KEY environment variables are not set.
-            ConnectionError: If the provided base_url is not accessible.
-
-        Returns:
-            None
+            ValueError: If access_key or secret_key is empty
+            requests.RequestException: If initial token fetch fails
         """
-
         if not access_key or not secret_key:
-            logger.error(
-                "RAGAAI_CATALYST_ACCESS_KEY and RAGAAI_CATALYST_SECRET_KEY environment variables must be set"
+            raise ValueError(
+                "access_key and secret_key are required. "
+                "Get your keys from Settings -> Authenticate in the RagaAI Catalyst dashboard."
             )
 
-        RagaAICatalyst.access_key, RagaAICatalyst.secret_key = (
-            self._set_access_key_secret_key(access_key, secret_key)
-        )
+        self._set_access_key_secret_key(access_key, secret_key)
 
-        RagaAICatalyst.BASE_URL = (
-            os.getenv("RAGAAI_CATALYST_BASE_URL")
-            if os.getenv("RAGAAI_CATALYST_BASE_URL")
-            else "https://catalyst.raga.ai/api"
+        self.base_url = (
+            self._normalize_base_url(base_url) if base_url
+            else os.getenv("RAGAAI_CATALYST_BASE_URL", self._DEFAULT_BASE_URL)
         )
+        self.timeout = self._DEFAULT_TIMEOUT
 
-        if base_url:
-            RagaAICatalyst.BASE_URL = self._normalize_base_url(base_url)
-            os.environ["RAGAAI_CATALYST_BASE_URL"] = RagaAICatalyst.BASE_URL
+        os.environ["RAGAAI_CATALYST_BASE_URL"] = self.base_url
 
         AuthManager.initialize(
             access_key=access_key,
             secret_key=secret_key,
-            base_url=RagaAICatalyst.BASE_URL,
+            base_url=self.base_url,
             token_expiry_hours=token_expiry_time
         )
 
         try:
             AuthManager.get_token(force_refresh=True)
-        except requests.exceptions.RequestException:
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to authenticate with provided credentials: {e}")
             if base_url:
-                logger.error("The provided base_url is not accessible. Please re-check the base_url.")
+                logger.error("The provided base_url may not be accessible.")
+            raise
 
         self.api_keys = api_keys or {}
 
@@ -84,41 +85,25 @@ class RagaAICatalyst:
             self._upload_keys()
 
     @staticmethod
-    def _normalize_base_url(url):
-        url = re.sub(
-            r"(?<!:)//+", "/", url
-        )  # Ignore the `://` part of URLs and remove extra // if any
-        url = url.rstrip("/")  # To remove trailing slashes
-        if not url.endswith("/api"):  # To ensure it ends with /api
+    def _normalize_base_url(url: str) -> str:
+        """Normalize and validate base URL format."""
+        url = re.sub(r"(?<!:)//+", "/", url)
+        url = url.rstrip("/")
+        if not url.endswith("/api"):
             url = f"{url}/api"
         return url
 
-    def _set_access_key_secret_key(self, access_key, secret_key):
+    def _set_access_key_secret_key(self, access_key: str, secret_key: str) -> None:
+        """Set credentials in environment variables for backward compatibility."""
         os.environ["RAGAAI_CATALYST_ACCESS_KEY"] = access_key
         os.environ["RAGAAI_CATALYST_SECRET_KEY"] = secret_key
 
-        return access_key, secret_key
-
-    def _upload_keys(self):
+    def _upload_keys(self) -> None:
         """
-        Uploads API keys to the server for the RagaAICatalyst.
-
-        This function uploads the API keys stored in the `api_keys` attribute of the `RagaAICatalyst` object to the server. It sends a POST request to the server with the API keys in the request body. The request is authenticated using a bearer token obtained from the `RAGAAI_CATALYST_TOKEN` environment variable.
-
-        Parameters:
-            None
-
-        Returns:
-            None
+        Upload third-party API keys to RagaAI platform.
 
         Raises:
-            ValueError: If the `RAGAAI_CATALYST_ACCESS_KEY` or `RAGAAI_CATALYST_SECRET_KEY` environment variables are not set.
-
-        Side Effects:
-            - Sends a POST request to the server.
-            - Prints "API keys uploaded successfully" if the request is successful.
-            - Logs an error message if the request fails.
-
+            requests.RequestException: If upload fails
         """
         headers = {
             "Content-Type": "application/json",
@@ -130,23 +115,23 @@ class RagaAICatalyst:
         ]
         json_data = {"secrets": secrets}
         start_time = time.time()
-        endpoint = f"{RagaAICatalyst.BASE_URL}/v1/llm/secrets/upload"
+        endpoint = f"{self.base_url}/v1/llm/secrets/upload"
         response = requests.post(
             endpoint,
             headers=headers,
             json=json_data,
-            timeout=RagaAICatalyst.TIMEOUT,
+            timeout=self.timeout,
         )
         elapsed_ms = (time.time() - start_time) * 1000
         logger.debug(
             f"API Call: [POST] {endpoint} | Status: {response.status_code} | Time: {elapsed_ms:.2f}ms"
         )
         if response.status_code == 200:
-            print("API keys uploaded successfully")
+            logger.info("API keys uploaded successfully")
         else:
-            logger.error("Failed to upload API keys")
+            logger.error(f"Failed to upload API keys: Status {response.status_code}")
 
-    def add_api_key(self, service: str, key: str):
+    def add_api_key(self, service: str, key: str) -> None:
         """Add or update an API key for a specific service."""
         self.api_keys[service] = key
 
@@ -158,7 +143,7 @@ class RagaAICatalyst:
         self,
         method: str,
         endpoint: str,
-        json_data: Optional[Dict] = None,
+        json_data: Optional[Dict[str, Any]] = None,
         retry_on_401: bool = True
     ) -> Optional[requests.Response]:
         """
@@ -180,11 +165,11 @@ class RagaAICatalyst:
             Response object on success, None on failure
         """
         from ragaai_catalyst.session_manager import session_manager
-        
+
         headers = self.get_auth_header()
         headers["Content-Type"] = "application/json"
-        
-        url = f"{RagaAICatalyst.BASE_URL}{endpoint}"
+
+        url = f"{self.base_url}{endpoint}"
         
         try:
             start_time = time.time()
@@ -193,7 +178,7 @@ class RagaAICatalyst:
                 url,
                 headers=headers,
                 json=json_data,
-                timeout=self.TIMEOUT
+                timeout=self.timeout
             )
             elapsed_ms = (time.time() - start_time) * 1000
             logger.debug(
@@ -225,34 +210,34 @@ class RagaAICatalyst:
     def _get_credentials() -> tuple[str, str]:
         """
         Get access key and secret key from instance or environment.
-        
+
         Deprecated: Use AuthManager._get_credentials() instead.
         Kept for backward compatibility.
         """
         return AuthManager._get_credentials()
 
     @staticmethod
-    def _refresh_token_async():
+    def _refresh_token_async() -> None:
         """
         Refresh token in background thread.
-        
+
         Deprecated: Use AuthManager._refresh_token_async() instead.
         Kept for backward compatibility.
         """
         return AuthManager._refresh_token_async()
 
     @staticmethod
-    def _schedule_token_refresh():
+    def _schedule_token_refresh() -> None:
         """
         Schedule a token refresh to happen 20 seconds before expiration.
-        
+
         Deprecated: Use AuthManager._schedule_token_refresh() instead.
         Kept for backward compatibility.
         """
         return AuthManager._schedule_token_refresh()
 
     @staticmethod
-    def get_token(force_refresh=False) -> Union[str, None]:
+    def get_token(force_refresh: bool = False) -> Optional[str]:
         """
         Retrieves or refreshes a token using the provided credentials.
 
@@ -268,7 +253,7 @@ class RagaAICatalyst:
         """
         return AuthManager.get_token(force_refresh=force_refresh)
 
-    def ensure_valid_token(self) -> Union[str, None]:
+    def ensure_valid_token(self) -> Optional[str]:
         """
         Ensures a valid token is available, with different handling for missing token vs expired token:
         - Missing token: Synchronous retrieval (fail fast)
@@ -297,12 +282,12 @@ class RagaAICatalyst:
         """
         return AuthManager.get_auth_header()
 
-    def project_use_cases(self):
+    def project_use_cases(self) -> List[str]:
         """
         Retrieve list of available project use cases.
-        
+
         Returns:
-            list: List of use case strings, or empty list on failure
+            List of use case strings, or empty list on failure
         """
         response = self._make_authenticated_request("GET", "/v2/llm/usecase")
         
@@ -316,17 +301,25 @@ class RagaAICatalyst:
         logger.error("Failed to retrieve project use cases")
         return []
 
-    def create_project(self, project_name: str, usecase: str = "Q/A", type: str = "llm"):
+    def create_project(
+        self,
+        project_name: str,
+        usecase: str = "Q/A",
+        type: str = "llm"
+    ) -> str:
         """
-        Creates a project with the given project_name, type, and usecase.
+        Create a new project.
 
-        Parameters:
-            project_name (str): The name of the project to be created.
-            usecase (str, optional): The use case for the project. Defaults to "Q/A".
-            type (str, optional): The type of the project. Defaults to "llm".
+        Args:
+            project_name: Name of the project
+            usecase: Use case for the project (default: "Q/A")
+            type: Project type (default: "llm")
 
         Returns:
-            str: A message indicating the success or failure of the project creation.
+            Success or failure message
+
+        Raises:
+            ValueError: If project_name already exists or usecase is invalid
         """
         existing_projects = self.list_projects()
         if project_name in existing_projects:
@@ -346,8 +339,8 @@ class RagaAICatalyst:
         if response and response.status_code in [200, 201]:
             try:
                 project_data = response.json()["data"]
-                success_msg = f"Project Created Successfully with name {project_data['name']} & usecase {usecase}"
-                print(success_msg)
+                success_msg = f"Project created successfully: {project_data['name']} (usecase: {usecase})"
+                logger.info(success_msg)
                 return success_msg
             except (KeyError, TypeError) as e:
                 logger.error(f"Failed to parse project creation response: {e}")
@@ -358,15 +351,15 @@ class RagaAICatalyst:
         else:
             return "Failed to create project: Request failed"
 
-    def list_projects(self, num_projects: int = 99999):
+    def list_projects(self, num_projects: int = 99999) -> List[str]:
         """
-        Retrieves a list of projects with the specified number of projects.
+        Retrieve list of project names.
 
-        Parameters:
-            num_projects (int, optional): Number of projects to retrieve. Defaults to 99999.
+        Args:
+            num_projects: Maximum number of projects to retrieve (default: 99999)
 
         Returns:
-            list: A list of project names retrieved successfully, or empty list on failure.
+            List of project names, or empty list on failure
         """
         response = self._make_authenticated_request("GET", f"/v2/llm/projects?size={num_projects}")
         
@@ -387,12 +380,12 @@ class RagaAICatalyst:
             logger.error("Failed to list projects: Request failed")
             return []
 
-    def list_metrics(self):
+    def list_metrics(self) -> List[str]:
         """
         Retrieve list of available LLM evaluation metric names.
-        
+
         Returns:
-            list: List of metric name strings, or empty list on failure
+            List of metric name strings, or empty list on failure
         """
         response = self._make_authenticated_request("GET", "/v1/llm/llm-metrics")
         

@@ -1,9 +1,9 @@
 """
-Shared utilities for agentic tracing
+Shared utilities for tracing
 """
 import re
 from urllib.parse import urlparse, urlunparse
-from ragaai_catalyst.tracers.agentic_tracing.utils.logger import get_logger
+from ragaai_catalyst.tracers.utils.logger import get_logger
 
 
 def update_presigned_url(presigned_url, base_url):

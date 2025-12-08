@@ -54,7 +54,8 @@ class PromptManager:
             raise ValueError("Project name must be a non-empty string")
         
         self.project_name = project_name.strip()
-        self.base_url = f"{RagaAICatalyst.BASE_URL}/playground/prompt"
+        base_api_url = os.getenv("RAGAAI_CATALYST_BASE_URL", "https://catalyst.raga.ai/api")
+        self.base_url = f"{base_api_url}/playground/prompt"
         self.timeout = timeout or self.DEFAULT_TIMEOUT
         self.size = max_projects or self.DEFAULT_MAX_PROJECTS
         self.project_id: Optional[str] = None
@@ -72,9 +73,10 @@ class PromptManager:
             RuntimeError: If response parsing fails
         """
         try:
+            base_api_url = os.getenv("RAGAAI_CATALYST_BASE_URL", "https://catalyst.raga.ai/api")
             response = self._make_api_request(
                 "GET",
-                f"{RagaAICatalyst.BASE_URL}/v2/llm/projects?size={self.size}",
+                f"{base_api_url}/v2/llm/projects?size={self.size}",
                 headers={"Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}'}
             )
             
@@ -510,7 +512,8 @@ class PromptManager:
         Returns:
             List of model names, empty list on failure
         """
-        models_url = f"{RagaAICatalyst.BASE_URL}/v1/llm/models"
+        base_api_url = os.getenv("RAGAAI_CATALYST_BASE_URL", "https://catalyst.raga.ai/api")
+        models_url = f"{base_api_url}/v1/llm/models"
         response = self._make_api_request("POST", models_url, json={"providerName": provider_name})
         
         if response:
@@ -534,7 +537,8 @@ class PromptManager:
         Returns:
             List of parameter dictionaries, None on failure
         """
-        params_url = f"{RagaAICatalyst.BASE_URL}/playground/providers/models/parameters/list"
+        base_api_url = os.getenv("RAGAAI_CATALYST_BASE_URL", "https://catalyst.raga.ai/api")
+        params_url = f"{base_api_url}/playground/providers/models/parameters/list"
         response = self._make_api_request(
             "POST",
             params_url,

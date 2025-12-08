@@ -52,8 +52,11 @@ def create_dataset_schema_with_trace(
             "traceFolderUrl": None,
         })
 
-    # Use provided base_url or fall back to default
-    url_base = base_url if base_url is not None else RagaAICatalyst.BASE_URL
+    # Use provided base_url or fall back to environment variable or default
+    if base_url is None:
+        url_base = os.getenv("RAGAAI_CATALYST_BASE_URL", "https://catalyst.raga.ai/api")
+    else:
+        url_base = base_url
     endpoint = f"{url_base}/v1/llm/dataset/logs"
 
     def _make_request(retry_on_401=True):

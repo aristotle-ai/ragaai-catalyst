@@ -13,7 +13,7 @@ import threading
 from collections import OrderedDict
 from typing import Dict, Any, Optional, Callable, TypeVar
 
-from ragaai_catalyst.tracers.agentic_tracing.utils import get_logger
+from ragaai_catalyst.tracers.utils import get_logger
 
 logger = get_logger(__name__)
 

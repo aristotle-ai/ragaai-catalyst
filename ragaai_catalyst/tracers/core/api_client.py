@@ -13,7 +13,7 @@ from urllib3.exceptions import PoolError, MaxRetryError, NewConnectionError
 from requests.exceptions import ConnectionError, Timeout, RequestException
 from http.client import RemoteDisconnected
 
-from ragaai_catalyst.tracers.agentic_tracing.utils import get_logger
+from ragaai_catalyst.tracers.utils import get_logger
 
 logger = get_logger(__name__)
 

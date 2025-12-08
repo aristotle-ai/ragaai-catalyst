@@ -28,18 +28,19 @@ class TrackName:
             if 'IPKernelApp' in get_ipython().config:
                 return self._get_notebook_name()
         except Exception:
+            # Best-effort IPython detection - broad catch is intentional
             pass
 
         frame = inspect.stack()[4]
         return frame.filename
 
     def _get_decorated_file_name(self):
-        # Check if running in a Jupyter notebook
         try:
             from IPython import get_ipython
             if 'IPKernelApp' in get_ipython().config:
                 return self._get_notebook_name()
         except Exception:
+            # Best-effort IPython detection - broad catch is intentional
             pass
 
         # Default to the filename from the stack

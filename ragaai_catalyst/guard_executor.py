@@ -9,9 +9,10 @@ import logging
 # logger = logging.getLogger('LiteLLM')
 # logger.setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
-logging_level = (
-    logger.setLevel(logging.DEBUG) if os.getenv("DEBUG") == "1" else logging.INFO
-)
+
+# Configure debug level if DEBUG environment variable is set
+if os.getenv("DEBUG") == "1":
+    logger.setLevel(logging.DEBUG)
 
 
 class GuardExecutor:
@@ -62,7 +63,7 @@ class GuardExecutor:
         if response.json()['success']:
             return response.json()
         else:
-            print(response.json()['message'])
+            logger.error(response.json()['message'])
             return None
 
     def llm_executor(self,prompt,model_params,llm_caller):
@@ -80,7 +81,8 @@ class GuardExecutor:
             response = genai_client.models.generate(**model_params)
             return response.text
         else:
-            print(f"{llm_caller} not supported currently, use litellm as llm caller")
+            logger.error(f"{llm_caller} not supported currently, use litellm as llm caller")
+            return None
         '''
         elif llm_caller == 'anthropic':
             response = anthropic.completion(prompt=messages, **model_params)
@@ -138,7 +140,7 @@ class GuardExecutor:
         try:
             llm_response = self.llm_executor(prompt,model_params,llm_caller)
         except Exception as e:
-            print('Error in running llm:',str(e))
+            logger.error(f"Error in running llm: {str(e)}")
             return None, None, input_deployment_response
         if 'instruction' in self.field_map:
             instruction = prompt_params[self.field_map['instruction']]
@@ -217,7 +219,7 @@ class GuardExecutor:
         if response.json()['success']:
             return response.json()
         else:
-            print(response.json()['message'])
+            logger.error(response.json()['message'])
             return None
 
     @staticmethod

@@ -31,7 +31,7 @@ def convert_usage_to_dict(usage):
                 token_usage["reasoning"] = getattr(usage, "reasoning_tokens", 0)
             except AttributeError:
                 # If attributes are not found, log or handle the error as needed
-                print(f"Warning: Unexpected usage type: {type(usage)}")
+                logger.warning(f"Unexpected usage type: {type(usage)}")
 
     return token_usage
 
@@ -261,7 +261,8 @@ def format_interactions(trace) -> dict:
         if 'data' not in trace or not trace['data'][0].get("spans"):
             return {"workflow": []}
     except Exception as e:
-        print(f"Error in checking data or spans: {str(e)}")
+        logger.error(f"Error in checking data or spans: {str(e)}")
+        return {"workflow": []}
 
 
     for span in trace['data'][0].get("spans", []):
@@ -438,15 +439,15 @@ def format_interactions(trace) -> dict:
             interactions, key=lambda x: x.get("timestamp") if x.get("timestamp") else ""
         )
     except Exception as e:
-        print(f"Error in sorting interactions: {str(e)}")
-        
+        logger.error(f"Error in sorting interactions: {str(e)}")
+        sorted_interactions = interactions
 
     try:
         # Reassign IDs to maintain sequential order after sorting
         for idx, interaction in enumerate(sorted_interactions, 1):
             interaction["id"] = str(idx)
     except Exception as e:
-        print(f"Error in reassigning IDs: {str(e)}")
+        logger.error(f"Error in reassigning IDs: {str(e)}")
         
 
     return {"workflow": sorted_interactions}

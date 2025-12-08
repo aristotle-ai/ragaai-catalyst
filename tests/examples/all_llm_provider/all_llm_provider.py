@@ -1,6 +1,6 @@
 import sys
 import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from openai import OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI
 import vertexai
@@ -8,18 +8,14 @@ from vertexai.generative_models import GenerativeModel, GenerationConfig
 import google.generativeai as genai
 from litellm import completion, acompletion
 import litellm
-import argparse
 import anthropic
-import asyncio
 from anthropic import Anthropic, AsyncAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_google_vertexai import ChatVertexAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from groq import Groq, AsyncGroq
 
-from ragaai_catalyst import trace_llm
-from config import initialize_tracing
-tracer = initialize_tracing()
+from config import tracer
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -104,7 +100,7 @@ async def get_llm_response(
             return _get_litellm_response(prompt, model, temperature, max_tokens)
 
 
-@trace_llm(name="_get_openai_response")
+@tracer.tracer.llm
 def _get_openai_response(
     openai_client,
     prompt,
@@ -127,7 +123,7 @@ def _get_openai_response(
         print(f"Error with OpenAI API: {str(e)}")
         return None
 
-@trace_llm(name="_get_async_openai_response")
+@tracer.tracer.llm
 async def _get_async_openai_response(
     async_openai_client,
     prompt,
@@ -150,7 +146,7 @@ async def _get_async_openai_response(
         print(f"Error with async OpenAI API: {str(e)}")
         return None
 
-@trace_llm(name="_get_openai_beta_response")
+@tracer.tracer.llm
 def _get_openai_beta_response(
     openai_client,
     prompt,
@@ -175,7 +171,7 @@ def _get_openai_beta_response(
         messages = openai_client.beta.threads.messages.list(thread_id=thread.id)
         return messages.data[0].content[0].text.value
 
-@trace_llm(name="_get_azure_openai_response")
+@tracer.tracer.llm
 def _get_azure_openai_response(
     azure_openai_client,
     prompt,
@@ -198,7 +194,7 @@ def _get_azure_openai_response(
         print(f"Error with Azure OpenAI API: {str(e)}")
         return None
 
-@trace_llm(name="_get_async_azure_openai_response")
+@tracer.tracer.llm
 async def _get_async_azure_openai_response(
     async_azure_openai_client,
     prompt,
@@ -221,7 +217,7 @@ async def _get_async_azure_openai_response(
         print(f"Error with async Azure OpenAI API: {str(e)}")
         return None
 
-@trace_llm(name="_get_litellm_response")
+@tracer.tracer.llm
 def _get_litellm_response(
     prompt,
     model, 
@@ -243,7 +239,7 @@ def _get_litellm_response(
         print(f"Error with LiteLLM: {str(e)}")
         return None
 
-@trace_llm(name="_get_async_litellm_response")
+@tracer.tracer.llm
 async def _get_async_litellm_response(
     prompt,
     model, 
@@ -265,7 +261,7 @@ async def _get_async_litellm_response(
         print(f"Error with async LiteLLM: {str(e)}")
         return None
 
-@trace_llm(name="_get_vertexai_response")
+@tracer.tracer.llm
 def _get_vertexai_response(
     prompt,
     model, 
@@ -292,7 +288,7 @@ def _get_vertexai_response(
         print(f"Error with VertexAI: {str(e)}")
         return None
 
-@trace_llm(name="_get_async_vertexai_response")
+@tracer.tracer.llm
 async def _get_async_vertexai_response(
     prompt,
     model, 
@@ -318,7 +314,7 @@ async def _get_async_vertexai_response(
         print(f"Error with async VertexAI: {str(e)}")
         return None
 
-@trace_llm(name="_get_google_generativeai_response")
+@tracer.tracer.llm
 def _get_google_generativeai_response(
     prompt,
     model, 
@@ -342,7 +338,7 @@ def _get_google_generativeai_response(
         print(f"Error with Google GenerativeAI: {str(e)}")
         return None
 
-@trace_llm(name="_get_async_google_generativeai_response")
+@tracer.tracer.llm
 async def _get_async_google_generativeai_response(
     prompt,
     model, 
@@ -366,7 +362,7 @@ async def _get_async_google_generativeai_response(
         print(f"Error with async Google GenerativeAI: {str(e)}")
         return None
 
-@trace_llm(name="_get_anthropic_response")
+@tracer.tracer.llm
 def _get_anthropic_response(
     anthropic_client,
     prompt,
@@ -386,7 +382,7 @@ def _get_anthropic_response(
         print(f"Error with Anthropic: {str(e)}")
         return None
 
-@trace_llm(name="_get_async_anthropic_response")
+@tracer.tracer.llm
 async def _get_async_anthropic_response(
     async_anthropic_client,
     prompt,
@@ -406,7 +402,7 @@ async def _get_async_anthropic_response(
         print(f"Error with async Anthropic: {str(e)}")
         return None
 
-@trace_llm(name="_get_chat_google_generativeai_response")
+@tracer.tracer.llm
 def _get_chat_google_generativeai_response(
     prompt,
     model, 
@@ -427,7 +423,7 @@ def _get_chat_google_generativeai_response(
         print(f"Error with Google GenerativeAI: {str(e)}")
         return None
 
-@trace_llm(name="_get_async_chat_google_generativeai_response")
+@tracer.tracer.llm
 async def _get_async_chat_google_generativeai_response(
     prompt,
     model, 
@@ -448,7 +444,7 @@ async def _get_async_chat_google_generativeai_response(
         print(f"Error with async Google GenerativeAI: {str(e)}")
         return None
 
-@trace_llm(name="_get_chat_vertexai_response")
+@tracer.tracer.llm
 def _get_chat_vertexai_response(
     prompt,
     model, 
@@ -472,7 +468,7 @@ def _get_chat_vertexai_response(
         print(f"Error with VertexAI: {str(e)}")
         return None
 
-@trace_llm(name="_get_async_chat_vertexai_response")
+@tracer.tracer.llm
 async def _get_async_chat_vertexai_response(
     prompt,
     model, 
@@ -496,7 +492,7 @@ async def _get_async_chat_vertexai_response(
         print(f"Error with async VertexAI: {str(e)}")
         return None
 
-@trace_llm(name="_get_groq_response")
+@tracer.tracer.llm
 def _get_groq_response(
     groq_client,
     prompt,
@@ -516,7 +512,7 @@ def _get_groq_response(
         print(f"Error with Groq: {str(e)}")
         return None
 
-@trace_llm(name="_get_async_groq_response")
+@tracer.tracer.llm
 async def _get_async_groq_response(
     async_groq_client,
     prompt,
@@ -535,28 +531,4 @@ async def _get_async_groq_response(
     except Exception as e:
         print(f"Error with async Groq: {str(e)}")
         return None
-
-
-if __name__ == "__main__":
-    # Parse command-line arguments
-    parser = argparse.ArgumentParser(description="Run the LLM provider test with different LLM models.")
-    parser.add_argument("--model", type=str, default="gpt-4o-mini", help="The model to use (e.g., gpt-4o-mini).")
-    parser.add_argument("--provider", type=str, default="openai", help="The LLM provider (e.g., openai, azure, google).")
-    parser.add_argument("--async_llm", type=bool, default=False, help="Whether to use async LLM calls.")
-    args = parser.parse_args()
-    
-
-    with tracer:
-        response =  asyncio.run(get_llm_response(
-            prompt="Hello, how are you? Explain in one sentence.",
-            model=args.model,
-            provider=args.provider,
-            temperature=0.7,
-            max_tokens=100,
-            async_llm=args.async_llm
-        ))
-
-
-
-
 

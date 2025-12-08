@@ -10,7 +10,7 @@ import threading
 import concurrent.futures
 from typing import Dict, Any, Callable, Optional
 
-from ragaai_catalyst.tracers.agentic_tracing.utils import get_logger
+from ragaai_catalyst.tracers.utils import get_logger
 
 logger = get_logger(__name__)
 
