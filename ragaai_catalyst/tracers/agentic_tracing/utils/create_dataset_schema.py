@@ -10,6 +10,7 @@ from http.client import RemoteDisconnected
 
 from ragaai_catalyst import RagaAICatalyst
 from ragaai_catalyst.session_manager import session_manager
+from ragaai_catalyst.auth_manager import AuthManager
 
 IGNORED_KEYS = {"log_source", "recorded_on"}
 logger = logging.getLogger(__name__)
@@ -32,11 +33,12 @@ def create_dataset_schema_with_trace(
                 continue
             schema_mapping[key] = {"columnType": "metadata"}
 
-    headers = {
+    # Use AuthManager for headers
+    headers = AuthManager.get_auth_header()
+    headers.update({
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
         "X-Project-Name": project_name,
-    }
+    })
 
     if schema_mapping:
         payload = json.dumps({
@@ -50,32 +52,13 @@ def create_dataset_schema_with_trace(
             "traceFolderUrl": None,
         })
 
-    try:
-        # Use provided base_url or fall back to default
-        url_base = base_url if base_url is not None else RagaAICatalyst.BASE_URL
-        start_time = time.time()
-        endpoint = f"{url_base}/v1/llm/dataset/logs"
+    # Use provided base_url or fall back to default
+    url_base = base_url if base_url is not None else RagaAICatalyst.BASE_URL
+    endpoint = f"{url_base}/v1/llm/dataset/logs"
 
-        response = session_manager.make_request_with_retry(
-            "POST", endpoint, headers=headers, data=payload, timeout=timeout
-        )
-
-        elapsed_ms = (time.time() - start_time) * 1000
-        logger.debug(
-            f"API Call: [POST] {endpoint} | Status: {response.status_code} | Time: {elapsed_ms:.2f}ms"
-        )
-
-        if response.status_code in [200, 201]:
-            logger.info(f"Dataset schema created successfully: {response.status_code}")
-            return response
-        elif response.status_code == 401:
-            logger.warning("Received 401 error during dataset schema creation. Attempting to refresh token.")
-            RagaAICatalyst.get_token(force_refresh=True)
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
-                "X-Project-Name": project_name,
-            }
+    def _make_request(retry_on_401=True):
+        try:
+            start_time = time.time()
             response = session_manager.make_request_with_retry(
                 "POST", endpoint, headers=headers, data=payload, timeout=timeout
             )
@@ -83,18 +66,24 @@ def create_dataset_schema_with_trace(
             logger.debug(
                 f"API Call: [POST] {endpoint} | Status: {response.status_code} | Time: {elapsed_ms:.2f}ms"
             )
+
             if response.status_code in [200, 201]:
-                logger.info(f"Dataset schema created successfully after 401: {response.status_code}")
+                logger.info(f"Dataset schema created successfully: {response.status_code}")
                 return response
+            elif response.status_code == 401 and retry_on_401:
+                logger.warning("Received 401 error. Attempting to refresh token.")
+                AuthManager.get_token(force_refresh=True)
+                # Update header with new token
+                headers.update(AuthManager.get_auth_header())
+                return _make_request(retry_on_401=False)
             else:
-                logger.error(f"Failed to create dataset schema after 401: {response.status_code}")
+                logger.error(f"Failed to create dataset schema: {response.status_code}")
                 return None
-        else:
-            logger.error(f"Failed to create dataset schema: {response.status_code}")
+        except (PoolError, MaxRetryError, NewConnectionError, ConnectionError, Timeout, RemoteDisconnected) as e:
+            session_manager.handle_request_exceptions(e, "creating dataset schema")
             return None
-    except (PoolError, MaxRetryError, NewConnectionError, ConnectionError, Timeout, RemoteDisconnected) as e:
-        session_manager.handle_request_exceptions(e, "creating dataset schema")
-        return None
-    except RequestException as e:
-        logger.error(f"Failed to create dataset schema: {e}")
-        return None
+        except RequestException as e:
+            logger.error(f"Failed to create dataset schema: {e}")
+            return None
+
+    return _make_request()

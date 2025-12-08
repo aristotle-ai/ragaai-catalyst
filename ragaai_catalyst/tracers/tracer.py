@@ -321,11 +321,20 @@ class Tracer:
                 logger.error("feedback is required")
                 return None
             
+            # Get project ID for the feedback request
+            from ragaai_catalyst.tracers.agentic_tracing.core.api_client import TraceAPIClient
+            api_client = TraceAPIClient(self.base_url, self.project_name, self.timeout)
+            project_id = api_client.get_project_id(self.project_name)
+
+            if not project_id:
+                logger.error("Failed to get project ID for feedback request")
+                return None
+
             url = f"{self.base_url}/v1/llm/feedback"
             headers = {
                 'Accept': 'application/json, text/plain, */*',
                 'Authorization': f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
-                'X-Project-Id': str(self.project_id),
+                'X-Project-Id': str(project_id),
                 'Content-Type': 'application/json'
             }
             payload = json.dumps({
@@ -338,7 +347,7 @@ class Tracer:
             response = session_manager.make_request_with_retry(
                 "POST", url, headers=headers, data=payload, timeout=self.timeout
             )
-            
+            print("response=", response)
             return response.json() if response else None
             
         except (PoolError, MaxRetryError, NewConnectionError, ConnectionError, Timeout, RemoteDisconnected) as e:
