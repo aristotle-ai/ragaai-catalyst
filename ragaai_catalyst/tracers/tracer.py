@@ -15,7 +15,6 @@ from ragaai_catalyst.session_manager import session_manager
 from ragaai_catalyst.tracers.constants import TracerConstants, TracerType
 from ragaai_catalyst.tracers.instrumentor_registry import get_instrumentors_for_type
 from ragaai_catalyst.tracers.agentic_tracing.utils.file_name_tracker import TrackName
-from ragaai_catalyst.tracers.agentic_tracing.core.api_client import TraceAPIClient
 
 from urllib3.exceptions import PoolError, MaxRetryError, NewConnectionError
 from requests.exceptions import ConnectionError, Timeout
@@ -313,7 +312,6 @@ class Tracer:
     
     def set_feedback(self, external_id: str, feedback: Any):
         """Set feedback for a trace by external ID."""
-        print("Hiiiiiiiiiii")
         try:
             if not external_id:
                 logger.error("external_id is required")
