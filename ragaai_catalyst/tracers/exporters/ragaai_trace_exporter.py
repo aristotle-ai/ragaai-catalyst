@@ -58,7 +58,6 @@ class RAGATraceExporter(SpanExporter):
             tracer_type: str,
             files_to_zip: Optional[List[str]] = None,
             user_details: Optional[Dict] = None,
-            custom_model_cost: Optional[dict] = None,
             timeout: int = 120,
             post_processor: Optional[Callable] = None,
             max_upload_workers: int = 30,
@@ -94,7 +93,6 @@ class RAGATraceExporter(SpanExporter):
         self.dataset_name = dataset_name
         self.user_details = user_details
         self.base_url = base_url
-        self.custom_model_cost = custom_model_cost
         self.system_monitor = SystemMonitor(dataset_name)
         self.timeout = timeout
         self.post_processor = post_processor
@@ -180,7 +178,6 @@ class RAGATraceExporter(SpanExporter):
             try:
                 ragaai_trace = convert_json_format(
                     spans,
-                    self.custom_model_cost,
                     self.user_context,
                     self.user_gt,
                     external_id_from_spans if external_id_from_spans else self.external_id,

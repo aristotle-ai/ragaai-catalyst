@@ -8,12 +8,6 @@ from typing import Any, Dict, List, Optional
 
 import pytz
 
-from ragaai_catalyst.tracers.agentic_tracing.utils.llm_utils import (
-    calculate_llm_cost,
-    count_tokens,
-    get_model_cost,
-)
-
 logger = logging.getLogger(__name__)
 
 
@@ -108,88 +102,6 @@ def _find_model_name(spans: List[Dict[str, Any]]) -> str:
     return ""
 
 
-def _calculate_tokens_for_span(span: Dict[str, Any]) -> tuple[float, float]:
-    attrs = span.get("attributes", {})
-    status = span.get("status", {})
-
-    prompt_tokens = attrs.get(SpanAttributes.PROMPT_TOKENS, 0)
-    completion_tokens = attrs.get(SpanAttributes.COMPLETION_TOKENS, 0)
-
-    is_llm_span = attrs.get(SpanAttributes.KIND) == SpanAttributes.LLM_KIND
-    is_error = status.get("status_code") == StatusCode.ERROR
-
-    if not is_llm_span or is_error:
-        return prompt_tokens, completion_tokens
-
-    try:
-        if prompt_tokens == 0:
-            prompt_value = attrs.get(SpanAttributes.INPUT_VALUE)
-            if prompt_value:
-                prompt_tokens = count_tokens(prompt_value)
-                logger.debug(f"Calculated prompt tokens: {prompt_tokens}")
-
-        if completion_tokens == 0:
-            completion_value = attrs.get(SpanAttributes.OUTPUT_VALUE)
-            if completion_value:
-                completion_tokens = count_tokens(completion_value)
-                logger.debug(f"Calculated completion tokens: {completion_tokens}")
-    except Exception as e:
-        logger.warning(f"Failed to calculate token counts: {e}")
-
-    return prompt_tokens, completion_tokens
-
-
-def _calculate_metrics(
-    spans: List[Dict[str, Any]], custom_model_cost: Optional[Dict[str, float]]
-) -> Dict[str, Dict[str, float]]:
-    metrics = {
-        "tokens": {"prompt_tokens": 0.0, "completion_tokens": 0.0, "total_tokens": 0.0},
-        "cost": {"input_cost": 0.0, "output_cost": 0.0, "total_cost": 0.0},
-    }
-
-    model_costs = get_model_cost()
-    model_name = _find_model_name(spans)
-
-    for span in spans:
-        if "attributes" not in span:
-            continue
-
-        prompt_tokens, completion_tokens = _calculate_tokens_for_span(span)
-
-        metrics["tokens"]["prompt_tokens"] += prompt_tokens
-        metrics["tokens"]["completion_tokens"] += completion_tokens
-        metrics["tokens"]["total_tokens"] += prompt_tokens + completion_tokens
-
-        attrs = span.get("attributes", {})
-        is_llm_span = attrs.get(SpanAttributes.KIND) == SpanAttributes.LLM_KIND
-
-        if model_name and is_llm_span:
-            try:
-                span_cost = calculate_llm_cost(
-                    {
-                        "prompt_tokens": prompt_tokens,
-                        "completion_tokens": completion_tokens,
-                        "total_tokens": prompt_tokens + completion_tokens,
-                    },
-                    model_name,
-                    model_costs,
-                    custom_model_cost,
-                )
-                
-                metrics["cost"]["input_cost"] += span_cost["input_cost"]
-                metrics["cost"]["output_cost"] += span_cost["output_cost"]
-                metrics["cost"]["total_cost"] += span_cost["total_cost"]
-
-                span["attributes"][SpanAttributes.LLM_COST] = span_cost
-            except Exception as e:
-                logger.warning(f"Failed to calculate span cost: {e}")
-
-    metrics["total_cost"] = metrics["cost"]["total_cost"]
-    metrics["total_tokens"] = metrics["tokens"]["total_tokens"]
-
-    return metrics
-
-
 def _create_base_trace(
     input_trace: List[Dict[str, Any]], external_id: Optional[str]
 ) -> Dict[str, Any]:
@@ -277,7 +189,6 @@ def _add_custom_spans(
 
 def convert_json_format(
     input_trace: List[Dict[str, Any]],
-    custom_model_cost: Optional[Dict[str, float]],
     user_context: Optional[str],
     user_gt: Optional[str],
     external_id: Optional[str],
@@ -292,10 +203,6 @@ def convert_json_format(
         spans = _add_custom_spans(spans, trace_id, parent_id, user_context, user_gt)
         
         final_trace["data"][0]["spans"] = spans
-        
-        metrics = _calculate_metrics(spans, custom_model_cost)
-        final_trace["metadata"] = metrics
-
         return final_trace
 
     except Exception as e:
