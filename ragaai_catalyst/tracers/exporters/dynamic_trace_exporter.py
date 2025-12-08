@@ -23,7 +23,6 @@ class DynamicTraceExporter(SpanExporter):
             tracer_type: str,
             files_to_zip: Optional[List[str]] = None,
             user_details: Optional[Dict] = None,
-            custom_model_cost: Optional[dict] = None,
             timeout: int = 120,
             post_processor: Optional[Callable] = None,
             max_upload_workers: int = 30,
@@ -52,7 +51,6 @@ class DynamicTraceExporter(SpanExporter):
             tracer_type=tracer_type,
             files_to_zip=files_to_zip,
             user_details=user_details,
-            custom_model_cost=custom_model_cost,
             timeout=timeout,
             post_processor=post_processor,
             max_upload_workers=max_upload_workers,
@@ -66,7 +64,6 @@ class DynamicTraceExporter(SpanExporter):
         self._dataset_name = dataset_name
         self._user_details = user_details
         self._base_url = base_url
-        self._custom_model_cost = custom_model_cost
         self._post_processor = post_processor
         self._max_upload_workers = max_upload_workers
         self._user_context = user_context
@@ -119,7 +116,6 @@ class DynamicTraceExporter(SpanExporter):
         self._exporter.dataset_name = self._dataset_name
         self._exporter.user_details = self._user_details
         self._exporter.base_url = self._base_url
-        self._exporter.custom_model_cost = self._custom_model_cost
         self._exporter.post_processor = self._post_processor
         self._exporter.max_upload_workers = self._max_upload_workers
         self._exporter.user_context = self._user_context

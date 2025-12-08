@@ -140,7 +140,6 @@ class Tracer:
             tracer_type=self.tracer_type,
             files_to_zip=list_of_unique_files,
             user_details=self.user_details,
-            custom_model_cost=self.model_custom_cost,
             timeout=self.timeout,
             post_processor=self.post_processor,
             max_upload_workers=self.max_upload_workers,
