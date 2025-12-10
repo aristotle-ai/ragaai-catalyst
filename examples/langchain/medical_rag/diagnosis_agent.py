@@ -11,7 +11,7 @@ from langchain_community.llms import OpenAI
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.output_parsers import StrOutputParser
 
-from ragaai_catalyst import RagaAICatalyst, init_tracing
+from ragaai_catalyst import RagaAICatalyst
 from ragaai_catalyst.tracers import Tracer
 
 from dotenv import load_dotenv

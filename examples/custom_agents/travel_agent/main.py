@@ -6,27 +6,18 @@ from tools import (
     flight_price_estimator_tool,
 )
 from agents import ItineraryAgent
-from config import initialize_tracing
 
 import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 
-from ragaai_catalyst import trace_agent, current_span
+import config
+from config import tracer
 
 load_dotenv()
 
-tracer = initialize_tracing()
-
-@trace_agent(name="travel_agent")
+@tracer.tracer.agent
 def travel_agent():
-    current_span().add_metrics(
-        name="travel_planning_session",
-        score=0.9,
-        reasoning="Main travel planning session",
-        cost=0.05,
-        latency=1.0,
-    )
     
     print("Welcome to the Personalized Travel Planner!\n")
 

@@ -1,12 +1,9 @@
 from typing import Tuple
 import asyncio
 from all_llm_provider import get_llm_response
-from config import initialize_tracing
 import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
-
-tracer = initialize_tracing()
 
 # Define test cases for each provider
 TEST_CASES = {
