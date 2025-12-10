@@ -4,25 +4,14 @@ from tools import (
     currency_converter_tool,
     flight_price_estimator_tool,
 )
-import sys
-import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../..')))
-from ragaai_catalyst import trace_agent, current_span
+from config import tracer
 
 class ItineraryAgent:
     def __init__(self, persona="Itinerary Agent"):
         self.persona = persona
 
-    @trace_agent(name="plan_itinerary", agent_type="travel_planner", version="1.0.0")
+    @tracer.tracer.agent
     def plan_itinerary(self, user_preferences, duration=3):
-        # Add metrics for the planning process
-        current_span().add_metrics(
-            name="itinerary_planning",
-            score=0.8,
-            reasoning="Planning comprehensive travel itinerary",
-            cost=0.01,
-            latency=0.5,
-        )
         
         # Get weather information
         weather = weather_tool(user_preferences["destination"])

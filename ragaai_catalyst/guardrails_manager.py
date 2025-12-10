@@ -19,7 +19,7 @@ class GuardrailsManager:
         self.num_projects = 99999
         self.deployment_name = "NA"
         self.deployment_id = "NA"
-        self.base_url = f"{RagaAICatalyst.BASE_URL}"
+        self.base_url = os.getenv("RAGAAI_CATALYST_BASE_URL", "https://catalyst.raga.ai/api")
         list_projects, project_name_with_id = self._get_project_list()
         if project_name not in list_projects:
             raise ValueError(f"Project '{self.project_name}' does not exists")
@@ -74,7 +74,7 @@ class GuardrailsManager:
         if response.json()['success']:
             return response.json()
         else:
-            print('Error in retrieving deployment details:',response.json()['message'])
+            logger.error(f"Error in retrieving deployment details: {response.json()['message']}")
             return None
 
 
@@ -195,12 +195,13 @@ class GuardrailsManager:
         if response.status_code == 409:
             raise ValueError(f"Data with '{deployment_name}' already exists, choose a unique name")
         if response.json()["success"]:
-            print(response.json()["message"])
+            logger.info(response.json()["message"])
             deployment_ids = self.list_deployment_ids()
             self.deployment_id = [_["id"] for _ in deployment_ids if _["name"]==self.deployment_name][0]
             return self.deployment_id
         else:
-            print(response)
+            logger.error(f"Failed to create deployment: {response.text}")
+            return None
             
 
     def add_guardrails(self, deployment_id, guardrails, guardrails_config={}):
@@ -241,9 +242,9 @@ class GuardrailsManager:
                 }
         response = requests.request("POST", f"{self.base_url}/guardrail/deployment/{str(self.deployment_id)}/configure", headers=headers, data=payload)
         if response.json()["success"]:
-            print(response.json()["message"])
+            logger.info(response.json()["message"])
         else:
-            print('Error updating guardrail ',response.json()['message'])
+            logger.error(f"Error updating guardrail: {response.json()['message']}")
 
     def _get_guardrail_config_payload(self, guardrails_config):
         """

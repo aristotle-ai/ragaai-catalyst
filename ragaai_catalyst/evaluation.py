@@ -18,7 +18,7 @@ class Evaluation:
     def __init__(self, project_name, dataset_name):
         self.project_name = project_name
         self.dataset_name = dataset_name
-        self.base_url = f"{RagaAICatalyst.BASE_URL}"
+        self.base_url = os.getenv("RAGAAI_CATALYST_BASE_URL", "https://catalyst.raga.ai/api")
         self.timeout = 20
         self.jobId = None
         self.num_projects=99999
@@ -342,7 +342,7 @@ class Evaluation:
                 logger.error(response.json()["message"])
             response.raise_for_status()
             if response.json()["success"]:
-                print(response.json()["message"])
+                logger.info(response.json()["message"])
                 self.jobId = response.json()["data"]["jobId"]
 
         except requests.exceptions.HTTPError as http_err:
@@ -388,7 +388,7 @@ class Evaluation:
                 logger.error(response.json()["message"])
             response.raise_for_status()
             if response.json()["success"]:
-                print(response.json()["message"])
+                logger.info(response.json()["message"])
                 self.jobId = response.json()["data"]["jobId"]
 
         except requests.exceptions.HTTPError as http_err:
@@ -417,13 +417,13 @@ class Evaluation:
             if response.json()["success"]:
                 status_json = [item["status"] for item in response.json()["data"]["content"] if item["id"]==self.jobId][0]
                 if status_json == "Failed":
-                    print("Job failed. No results to fetch.")
+                    logger.error("Job failed. No results to fetch.")
                     return JOB_STATUS_FAILED
                 elif status_json == "In Progress":
-                    print(f"Job in progress. Please wait while the job completes.\nVisit Job Status: {self.base_url.removesuffix('/api')}/projects/job-status?projectId={self.project_id} to track")
+                    logger.info(f"Job in progress. Please wait while the job completes.\nVisit Job Status: {self.base_url.removesuffix('/api')}/projects/job-status?projectId={self.project_id} to track")
                     return JOB_STATUS_IN_PROGRESS
                 elif status_json == "Completed":
-                    print(f"Job completed. Fetching results.\nVisit Job Status: {self.base_url.removesuffix('/api')}/projects/job-status?projectId={self.project_id} to check")
+                    logger.info(f"Job completed. Fetching results.\nVisit Job Status: {self.base_url.removesuffix('/api')}/projects/job-status?projectId={self.project_id} to check")
                     return JOB_STATUS_COMPLETED
                 else:
                     logger.error(f"Unknown status received: {status_json}")

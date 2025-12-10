@@ -1,4 +1,3 @@
-import argparse
 from dotenv import load_dotenv
 from tools import (
     llm_call,
@@ -7,27 +6,18 @@ from tools import (
     flight_price_estimator_tool,
 )
 from agents import ItineraryAgent
-from config import initialize_tracing
 
 import sys
 import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 
-from ragaai_catalyst import trace_agent, current_span
+import config
+from config import tracer
 
 load_dotenv()
 
-tracer = initialize_tracing()
-
-@trace_agent(name="travel_agent")
-def travel_agent(model_name: str = "gpt-4o-mini", provider: str = "openai"):
-    current_span().add_metrics(
-        name="travel_planning_session",
-        score=0.9,
-        reasoning="Main travel planning session",
-        cost=0.05,
-        latency=1.0,
-    )
+@tracer.tracer.agent
+def travel_agent():
     
     print("Welcome to the Personalized Travel Planner!\n")
 
@@ -46,7 +36,7 @@ def travel_agent(model_name: str = "gpt-4o-mini", provider: str = "openai"):
     Budget:
     Duration (in days):
     """
-    extracted_preferences = llm_call(preferences_prompt, name="extract_preferences", model_name=model_name, provider=provider)
+    extracted_preferences = llm_call(preferences_prompt, name="extract_preferences")
     print("\nExtracted Preferences:")
     print(extracted_preferences)
 
@@ -108,18 +98,10 @@ def travel_agent(model_name: str = "gpt-4o-mini", provider: str = "openai"):
 
     Travel Summary:
     """
-    travel_summary = llm_call(summary_prompt, name="generate_summary", model_name=model_name, provider=provider)
+    travel_summary = llm_call(summary_prompt, name="generate_summary")
     print("\nTravel Summary:")
     print(travel_summary)
 
 if __name__ == "__main__":
-    # Parse command-line arguments
-    parser = argparse.ArgumentParser(description="Run the travel agent.")
-    parser.add_argument("--model", type=str, default="gpt-4o-mini", help="The model to use (e.g., gpt-4o-mini).")
-    parser.add_argument("--provider", type=str, default="openai", help="The LLM provider (e.g., openai).")
-    args = parser.parse_args()
-
-
-    with tracer:
-        travel_agent(model_name=args.model, provider=args.provider)
+    travel_agent()
     

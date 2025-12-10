@@ -1,382 +1,202 @@
+"""
+Clean, standalone Tracer class for OpenTelemetry-based tracing.
+Independent of AgenticTracing - focused solely on instrumentation and export.
+"""
+
 import os
-import uuid
 import datetime
 import logging
-import asyncio
-import aiohttp
-import requests
-from litellm import model_cost
+from typing import Optional, Dict, Any, Callable
 from pathlib import Path
-from contextlib import contextmanager
-from concurrent.futures import ThreadPoolExecutor
-import tempfile
 import json
-import numpy as np
-from opentelemetry.sdk import trace as trace_sdk
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-from ragaai_catalyst.tracers.exporters.file_span_exporter import FileSpanExporter
-from ragaai_catalyst.tracers.utils import get_unique_key
-from openinference.instrumentation.langchain import LangChainInstrumentor
+
 from ragaai_catalyst import RagaAICatalyst
-from .agentic_tracing.upload.session_manager import session_manager
+from ragaai_catalyst.session_manager import session_manager
+from ragaai_catalyst.tracers.constants import TracerConstants, TracerType
+from ragaai_catalyst.tracers.instrumentor_registry import get_instrumentors_for_type
+from ragaai_catalyst.tracers.utils.file_name_tracker import TrackName
+from ragaai_catalyst.tracers.core.api_client import TraceAPIClient
+
 from urllib3.exceptions import PoolError, MaxRetryError, NewConnectionError
 from requests.exceptions import ConnectionError, Timeout
 from http.client import RemoteDisconnected
-from ragaai_catalyst.tracers.agentic_tracing import AgenticTracing
-from ragaai_catalyst.tracers.exporters.ragaai_trace_exporter import RAGATraceExporter
-from ragaai_catalyst.tracers.agentic_tracing.utils.file_name_tracker import TrackName
 
 logger = logging.getLogger(__name__)
-logging_level = (
-    logger.setLevel(logging.DEBUG) if os.getenv("DEBUG") == "1" else logging.INFO
-)
 
-class Tracer(AgenticTracing):
-    NUM_PROJECTS = 99999
+
+class TracerTypeSupport:
+    """Supported tracer types and their capabilities."""
+    LANGCHAIN = "langchain"
+    LLAMAINDEX = "llamaindex"
+    OPENAI = "openai"
+    AGENTIC = "agentic"
+    CUSTOM = "custom"
+    
+    CONTEXT_SUPPORTED = frozenset({LANGCHAIN, LLAMAINDEX})
+
+
+class Tracer:
+    """
+    Standalone tracer for OpenTelemetry-based instrumentation.
+    
+    Handles:
+    - Project validation
+    - Instrumentor setup (LangChain, OpenAI, etc.)
+    - Dynamic trace export
+    - Feedback management
+    - Context and ground truth injection
+    """
+    
+    MASKING_EXCLUDED_KEYS = frozenset({
+        'start_time', 'end_time', 'name', 'id',
+        'hash_id', 'parent_id', 'source_hash_id',
+        'cost', 'type', 'feedback', 'error', 'ctx',
+        'telemetry.sdk.version', 'telemetry.sdk.language',
+        'service.name', 'llm.model_name', 'llm.invocation_parameters',
+        'metadata', 'openinference.span.kind',
+        'llm.token_count.prompt', 'llm.token_count.completion', 'llm.token_count.total',
+        'input_cost', 'output_cost', 'total_cost',
+        'status_code', 'output.mime_type', 'span_id', 'trace_id'
+    })
+    
+    _PROCESSED_FILE_PREFIX = "processed_"
+    _JSON_INDENT = 4
+    
     def __init__(
         self,
-        project_name,
-        dataset_name,
-        trace_name=None,
-        tracer_type=None,
-        pipeline=None,
-        metadata=None,
-        description=None,
-        timeout=120,  # Default timeout of 120 seconds
-        update_llm_cost=True,  # Parameter to control model cost updates
-        auto_instrumentation={ # to control automatic instrumentation of different components
-            'llm':True,
-            'tool':True,
-            'agent':True,
-            'user_interaction':True,
-            'file_io':True,
-            'network':True,
-            'custom':True
-        },
-        interval_time=2,
-        max_upload_workers=30,
-        external_id=None
-
+        project_name: str,
+        dataset_name: str,
+        tracer_type: Optional[str] = None,
+        trace_name: Optional[str] = None,
+        pipeline: Optional[Dict[str, Any]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        timeout: int = TracerConstants.DEFAULT_TIMEOUT,
+        max_upload_workers: int = TracerConstants.DEFAULT_MAX_UPLOAD_WORKERS,
     ):
-        """
-        Initializes a Tracer object. 
-
-        Args:
-            project_name (str): The name of the project.
-            dataset_name (str): The name of the dataset.
-            tracer_type (str, optional): The type of tracer. Defaults to None.
-            pipeline (dict, optional): The pipeline configuration. Defaults to None.
-            metadata (dict, optional): The metadata. Defaults to None.
-            description (str, optional): The description. Defaults to None.
-            timeout (int, optional): The upload timeout in seconds. Defaults to 120.
-            update_llm_cost (bool, optional): Whether to update model costs from GitHub. Defaults to True.
-        """
-
-        user_detail = {
-            "project_name": project_name,
-            "project_id": None,  # Will be set after project validation
-            "dataset_name": dataset_name,
-            "interval_time": interval_time,
-            "trace_name": trace_name if trace_name else f"trace_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}",
-            "trace_user_detail": {"metadata": metadata} if metadata else {}
-        }
-
-        # take care of auto_instrumentation
-        if isinstance(auto_instrumentation, bool):
-            if tracer_type.startswith("agentic/"):
-                auto_instrumentation = {
-                    "llm": False,
-                    "tool": False,
-                    "agent": False,
-                    "user_interaction": False,
-                    "file_io": False,
-                    "network": False,
-                    "custom": False
-                }
-            elif auto_instrumentation:
-                auto_instrumentation = {
-                    "llm": True,
-                    "tool": True,
-                    "agent": True,
-                    "user_interaction": True,
-                    "file_io": True,
-                    "network": True,
-                    "custom": True
-                }
-            else:
-                auto_instrumentation = {
-                    "llm": False,
-                    "tool": False,
-                    "agent": False,
-                    "user_interaction": False,
-                    "file_io": False,
-                    "network": False,
-                    "custom": False
-                }
-        elif isinstance(auto_instrumentation, dict):
-            auto_instrumentation = {k: v for k, v in auto_instrumentation.items()}
-            for key in ["llm", "tool", "agent", "user_interaction", "file_io", "network", "custom"]:
-                if key not in auto_instrumentation:
-                    auto_instrumentation[key] = True
-        self.model_custom_cost = {}
-        super().__init__(user_detail=user_detail, auto_instrumentation=auto_instrumentation)
-
+        # Core configuration
         self.project_name = project_name
         self.dataset_name = dataset_name
         self.tracer_type = tracer_type
-        self.metadata = self._improve_metadata(metadata, tracer_type)
-        self.pipeline = pipeline
-        self.description = description
         self.timeout = timeout
-        self.base_url = f"{RagaAICatalyst.BASE_URL}"
-        self.timeout = timeout
-        self.num_projects = 99999
-        self.start_time = datetime.datetime.now().astimezone().isoformat()
-        self.model_cost_dict = model_cost
-        self.user_context = ""  # Initialize user_context to store context from add_context
-        self.user_gt = ""  # Initialize user_gt to store gt from add_gt
-        self.file_tracker = TrackName()
-        self.post_processor = None
         self.max_upload_workers = max_upload_workers
-        self.user_details = self._pass_user_data()
-        self.update_llm_cost = update_llm_cost
-        self.auto_instrumentation = auto_instrumentation
-        self.external_id = external_id
+
+        # Optional configuration
+        self.pipeline = pipeline or {}
+        self.metadata = self._prepare_metadata(metadata, tracer_type)
+        self.post_processor: Optional[Callable] = None
+
+        # Runtime state
+        self.trace_name = trace_name or f"trace_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+        self.base_url = RagaAICatalyst.BASE_URL
+        self.start_time = datetime.datetime.now().astimezone().isoformat()
+        self.model_custom_cost = {}
+        self.file_tracker = TrackName()
+
+        # OpenTelemetry components
+        self._tracer = None
+        self._tracer_provider = None
+        self.exporter = None
+        self.user_details = self._build_user_details()
+
+        # Initialize instrumentation if needed
+        if TracerType.requires_instrumentation(tracer_type):
+            self._setup_instrumentation()
+    
+    def _prepare_metadata(self, metadata: Optional[Dict], tracer_type: Optional[str]) -> Dict[str, Any]:
+        result = metadata.copy() if metadata else {}
+        result.setdefault("log_source", f"{tracer_type}_tracer" if tracer_type else "tracer")
+        result.setdefault("recorded_on", str(datetime.datetime.now()))
+        return result
+    
+    def _build_user_details(self) -> Dict[str, Any]:
+        return {
+            "project_name": self.project_name,
+            "dataset_name": self.dataset_name,
+            "trace_user_detail": {
+                "trace_id": "",
+                "session_id": None,
+                "trace_type": self.tracer_type,
+                "traces": [],
+                "metadata": self.metadata,
+                "pipeline": {
+                    "llm_model": (self.pipeline or {}).get("llm_model", ""),
+                    "vector_store": (self.pipeline or {}).get("vector_store", ""),
+                    "embed_model": (self.pipeline or {}).get("embed_model", "")
+                }
+            }
+        }
+    
+    def _setup_instrumentation(self):
+        from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+        from ragaai_catalyst.tracers.exporters.ragaai_trace_exporter import RAGATraceExporter
+        from ragaai_catalyst.tracers.processors.custom_span_processor import CustomSpanProcessor
+        from openinference.instrumentation import TracerProvider, TraceConfig
         
-        try:
-            response = requests.get(
-                f"{self.base_url}/v2/llm/projects?size={self.num_projects}",
-                headers={
-                    "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
-                },
-                timeout=self.timeout,
-            )
-            response.raise_for_status()
-            logger.debug("Projects list retrieved successfully")
-
-            project_list = [
-                project["name"] for project in response.json()["data"]["content"]
-            ]
-            if project_name not in project_list:
-                logger.error(f"Project {project_name} not found. Please enter a valid project name")
-            else:
-            
-                self.project_id = [
-                    project["id"] for project in response.json()["data"]["content"] if project["name"] == project_name
-                ][0]
-            self._pass_user_data()
-
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to retrieve projects list: {e}")
-
-        # Handle agentic tracers
-        if tracer_type == "agentic" or tracer_type.startswith("agentic/") or tracer_type == "langchain" or tracer_type == "llamaindex" or tracer_type == "google-adk" or tracer_type == "openai" or tracer_type == "custom":
-            # Setup instrumentors based on tracer type
-            instrumentors = []
-
-            # Add LLM Instrumentors
-            if tracer_type in ['agentic/crewai']:
-                try:
-                    from openinference.instrumentation.vertexai import VertexAIInstrumentor
-                    instrumentors.append((VertexAIInstrumentor, []))
-                except (ImportError, ModuleNotFoundError):
-                    logger.debug("VertexAI not available in environment")
-                try:
-                    from openinference.instrumentation.anthropic import AnthropicInstrumentor
-                    instrumentors.append((AnthropicInstrumentor, []))
-                except (ImportError, ModuleNotFoundError):
-                    logger.debug("Anthropic not available in environment")
-                try:
-                    from openinference.instrumentation.groq import GroqInstrumentor
-                    instrumentors.append((GroqInstrumentor, []))
-                except (ImportError, ModuleNotFoundError):
-                    logger.debug("Groq not available in environment")
-                try:
-                    from openinference.instrumentation.litellm import LiteLLMInstrumentor
-                    instrumentors.append((LiteLLMInstrumentor, []))
-                except (ImportError, ModuleNotFoundError):
-                    logger.debug("LiteLLM not available in environment")
-                try:
-                    from openinference.instrumentation.mistralai import MistralAIInstrumentor
-                    instrumentors.append((MistralAIInstrumentor, []))
-                except (ImportError, ModuleNotFoundError):
-                    logger.debug("MistralAI not available in environment")
-                try:
-                    from openinference.instrumentation.openai import OpenAIInstrumentor
-                    instrumentors.append((OpenAIInstrumentor, []))
-                except (ImportError, ModuleNotFoundError):
-                    logger.debug("OpenAI not available in environment")
-                try:
-                    from openinference.instrumentation.bedrock import BedrockInstrumentor
-                    instrumentors.append((BedrockInstrumentor, []))
-                except (ImportError, ModuleNotFoundError):
-                    logger.debug("Bedrock not available in environment")
-            
-            # If tracer_type is just "agentic", try to instrument all available packages
-            if tracer_type == "agentic":
-                logger.info("Attempting to instrument all available agentic packages")
+        instrumentors = get_instrumentors_for_type(self.tracer_type)
+        
+        if not instrumentors and self.tracer_type != "custom":
+            logger.warning(f"No instrumentors available for type: {self.tracer_type}")
+            return
+        
+        self.file_tracker.trace_main_file()
+        list_of_unique_files = self.file_tracker.get_unique_files()
+        
+        self.exporter = RAGATraceExporter(
+            project_name=self.project_name,
+            dataset_name=self.dataset_name,
+            base_url=self.base_url,
+            tracer_type=self.tracer_type,
+            files_to_zip=list_of_unique_files,
+            user_details=self.user_details,
+            timeout=self.timeout,
+            post_processor=self.post_processor,
+            max_upload_workers=self.max_upload_workers
+        )
+        
+        self._tracer_provider = TracerProvider(config=TraceConfig())
+        self._tracer_provider.add_span_processor(CustomSpanProcessor())
+        self._tracer_provider.add_span_processor(SimpleSpanProcessor(self.exporter))
+        
+        for instrumentor_class, args in instrumentors:
+            try:
+                instrumentor = instrumentor_class()
+                instrumentor.instrument(tracer_provider=self._tracer_provider, *args)
+                logger.info(f"Instrumented {instrumentor_class.__name__}")
                 
-                # Try to import and add all known instrumentors
-                try:
-                    # LlamaIndex
-                    try:
-                        from openinference.instrumentation.llama_index import LlamaIndexInstrumentor
-                        instrumentors.append((LlamaIndexInstrumentor, []))
-                        logger.info("Instrumenting LlamaIndex...")
-                    except (ImportError, ModuleNotFoundError):
-                        logger.debug("LlamaIndex not available in environment")
-                    
-                    # LangChain
-                    try:
-                        from openinference.instrumentation.langchain import LangChainInstrumentor
-                        instrumentors.append((LangChainInstrumentor, []))
-                        logger.info("Instrumenting LangChain...")
-                    except (ImportError, ModuleNotFoundError):
-                        logger.debug("LangChain not available in environment")
-                    
-                    # CrewAI
-                    try:
-                        from openinference.instrumentation.crewai import CrewAIInstrumentor
-                        instrumentors.append((CrewAIInstrumentor, []))
-                        logger.info("Instrumenting CrewAI...")
-                    except (ImportError, ModuleNotFoundError):
-                        logger.debug("CrewAI not available in environment")
-                    
-                    # Haystack
-                    try:
-                        from openinference.instrumentation.haystack import HaystackInstrumentor
-                        instrumentors.append((HaystackInstrumentor, []))
-                        logger.info("Instrumenting Haystack...")
-                    except (ImportError, ModuleNotFoundError):
-                        logger.debug("Haystack not available in environment")
-                    
-                    # AutoGen
-                    try:
-                        from openinference.instrumentation.autogen import AutogenInstrumentor
-                        instrumentors.append((AutogenInstrumentor, []))
-                        logger.info("Instrumenting AutoGen...")
-                    except (ImportError, ModuleNotFoundError):
-                        logger.debug("AutoGen not available in environment")
-                    
-                    # Smolagents
-                    try:
-                        from openinference.instrumentation.smolagents import SmolagentsInstrumentor
-                        instrumentors.append((SmolagentsInstrumentor, []))
-                        logger.info("Instrumenting Smolagents...")
-                    except (ImportError, ModuleNotFoundError):
-                        logger.debug("Smolagents not available in environment")
-
-                    # OpenAI Agents
-                    try:
-                        from openinference.instrumentation.openai_agents import OpenAIAgentsInstrumentor
-                        instrumentors.append((OpenAIAgentsInstrumentor, []))
-                        logger.info("Instrumenting OpenAI Agents...")
-                    except (ImportError, ModuleNotFoundError):
-                        logger.debug("OpenAI Agents not available in environment")
-                    
-                    if not instrumentors:
-                        logger.warning("No agentic packages found in environment to instrument")
-                        self._upload_task = None
-                        return
-                    
-                except Exception as e:
-                    logger.error(f"Error during auto-instrumentation: {str(e)}")
-                    self._upload_task = None
-                    return
-            
-            # Handle specific framework instrumentation
-            elif tracer_type == "agentic/llamaindex" or tracer_type == "llamaindex":
-                from openinference.instrumentation.llama_index import LlamaIndexInstrumentor
-                instrumentors += [(LlamaIndexInstrumentor, [])] 
-
-            elif tracer_type == "agentic/langchain" or tracer_type == "agentic/langgraph" or tracer_type == "langchain":
-                from openinference.instrumentation.langchain import LangChainInstrumentor
-                instrumentors += [(LangChainInstrumentor, [])]
-            
-            elif tracer_type == "agentic/crewai":
-                from openinference.instrumentation.crewai import CrewAIInstrumentor
-                from openinference.instrumentation.langchain import LangChainInstrumentor
-                instrumentors += [(CrewAIInstrumentor, []), (LangChainInstrumentor, [])]
-            
-            elif tracer_type == "agentic/haystack":
-                from openinference.instrumentation.haystack import HaystackInstrumentor
-                instrumentors += [(HaystackInstrumentor, [])]
-            
-            elif tracer_type == "agentic/autogen":
-                from openinference.instrumentation.autogen import AutogenInstrumentor
-                instrumentors += [(AutogenInstrumentor, [])]
-            
-            elif tracer_type == "agentic/smolagents":
-                from openinference.instrumentation.smolagents import SmolagentsInstrumentor
-                instrumentors += [(SmolagentsInstrumentor, [])]
-
-            elif tracer_type == "agentic/openai_agents":
-                from openinference.instrumentation.openai_agents import OpenAIAgentsInstrumentor
-                instrumentors += [(OpenAIAgentsInstrumentor, [])]
-            
-            elif tracer_type == "google-adk":
-                from  openinference.instrumentation.google_adk import GoogleADKInstrumentor
-                instrumentors += [(GoogleADKInstrumentor, [])]
-
-            elif tracer_type == "openai":
-                from openinference.instrumentation.openai import OpenAIInstrumentor
-                instrumentors += [(OpenAIInstrumentor, [])]
-
-            elif tracer_type == "custom":
-                pass
-
-            else:
-                # Unknown agentic tracer type
-                logger.warning(f"Unknown agentic tracer type: {tracer_type}")
-                self._upload_task = None
-                return
-                
-            # Common setup for all agentic tracers
-            self._tracer = self._setup_agentic_tracer(instrumentors)
-        else:
-            self._upload_task = None
-
-    def register_masking_function(self, masking_func):
+            except Exception as e:
+                logger.error(f"Failed to instrument {instrumentor_class.__name__}: {e}")
+        
+        self._tracer = self._tracer_provider.get_tracer(__name__)
+    
+    def register_masking_function(self, masking_func: Callable) -> None:
         """
-        Register a masking function that will be used to transform values in the trace data.
-        This method handles all file operations internally and creates a post-processor
-        using the provided masking function.
+        Register a masking function for sensitive data in traces.
+        
+        The masking function will be applied to all string values in trace data,
+        except for keys listed in MASKING_EXCLUDED_KEYS.
         
         Args:
-            masking_func (callable): A function that takes a value and returns the masked value.
-                The function should handle string transformations for masking sensitive data.
-                
-                Example:
-                def masking_function(value):
-                    if isinstance(value, str):
-                        value = re.sub(r'\b\d+\.\d+\b', 'x.x', value)
-                        value = re.sub(r'\b\d+\b', 'xxxx', value)
-                    return value
+            masking_func: Function that takes a string and returns the masked version
+            
+        Raises:
+            TypeError: If masking_func is not callable
+            
+        Example:
+            >>> def mask_email(text):
+            ...     return re.sub(r'\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b', '***@***.***', text)
+            >>> tracer.register_masking_function(mask_email)
         """
         if not callable(masking_func):
-            logger.error("masking_func must be a callable")
-
+            raise TypeError(f"masking_func must be callable, got {type(masking_func)}")
+        
         def recursive_mask_values(obj, parent_key=None):
-            """Apply masking to all values in nested structure."""
             try:
                 if isinstance(obj, dict):
                     return {k: recursive_mask_values(v, k) for k, v in obj.items()}
                 elif isinstance(obj, list):
                     return [recursive_mask_values(item, parent_key) for item in obj]
                 elif isinstance(obj, str):
-                    # List of keys that should NOT be masked
-                    excluded_keys = {
-                        'start_time', 'end_time', 'name', 'id', 
-                        'hash_id', 'parent_id', 'source_hash_id',
-                        'cost', 'type', 'feedback', 'error', 'ctx','telemetry.sdk.version',
-                        'telemetry.sdk.language','service.name', 'llm.model_name',
-                        'llm.invocation_parameters', 'metadata', 'openinference.span.kind',
-                        'llm.token_count.prompt', 'llm.token_count.completion', 'llm.token_count.total',
-                        "input_cost", "output_cost", "total_cost", "status_code", "output.mime_type",
-                        "span_id", "trace_id"
-                    }
-                    # Apply masking only if the key is NOT in the excluded list
-                    if parent_key and parent_key.lower() not in excluded_keys:
+                    if parent_key and parent_key.lower() not in self.MASKING_EXCLUDED_KEYS:
                         return masking_func(obj)
                     return obj
                 else:
@@ -384,357 +204,253 @@ class Tracer(AgenticTracing):
             except Exception as e:
                 logger.error(f"Error masking value: {e}")
                 return obj
-
+        
         def file_post_processor(original_trace_json_path: os.PathLike) -> os.PathLike:
             original_path = Path(original_trace_json_path)
             
-            # Read original JSON data
             with open(original_path, 'r') as f:
                 data = json.load(f)
             
             if 'data' in data:
                 data['data'] = recursive_mask_values(data['data'])
-            elif isinstance(data,list):
-                masked_traces = []
-                for item in data:
-                    if isinstance(item, dict) and 'traces' in item:
-                        item['traces'] = recursive_mask_values(item['traces'])
-                        masked_traces.append(item)
-                data = masked_traces
             
-            new_filename = f"processed_{original_path.name}"
-            dir_name, original_filename = os.path.split(original_trace_json_path)
+            new_filename = f"{self._PROCESSED_FILE_PREFIX}{original_path.name}"
+            dir_name = os.path.dirname(original_trace_json_path)
             final_trace_json_path = Path(dir_name) / new_filename
             
-            # Write modified data to the new file
             with open(final_trace_json_path, 'w') as f:
-                json.dump(data, f, indent=4)
+                json.dump(data, f, indent=self._JSON_INDENT)
             
-            logger.debug(f"Created masked trace file: {final_trace_json_path}")
             return final_trace_json_path
-
+        
         self.register_post_processor(file_post_processor)
-        logger.debug("Masking function registered successfully as post-processor")
-
     
-    def register_post_processor(self, post_processor_func):
+    def register_post_processor(self, post_processor_func: Callable) -> None:
         """
-        Register a post-processing function that will be called after trace generation.
+        Register a post-processing function for trace files.
         
         Args:
-            post_processor_func (callable): A function that takes a trace JSON file path as input
-                and returns a processed trace JSON file path.
-                The function signature should be:
-                def post_processor_func(original_trace_json_path: os.PathLike) -> os.PathLike
+            post_processor_func: Callable that takes a file path and returns processed file path
+            
+        Raises:
+            TypeError: If post_processor_func is not callable
         """
         if not callable(post_processor_func):
-            logger.error("post_processor_func must be a callable")
+            raise TypeError(f"post_processor_func must be callable, got {type(post_processor_func)}")
+        
         self.post_processor = post_processor_func
-        super().register_post_processor(post_processor_func)
-        if hasattr(self, 'dynamic_exporter'):
-            self.dynamic_exporter._exporter.post_processor = post_processor_func
-            self.dynamic_exporter._post_processor = post_processor_func
-        logger.info("Registered post process as: "+str(post_processor_func))
-
-
-    def set_external_id(self, external_id):
-        """
-        This method updates the external_id attribute of the dynamic exporter.
-        Args:
-            external_id (str): The new external_id to set
-        """
-        self.dynamic_exporter.external_id = external_id
-        logger.debug(f"Updated dynamic exporter's external_id to {external_id}")
-
-    def set_dataset_name(self, dataset_name):
-        """
-        This method updates the dataset_name attribute of the dynamic exporter.
-        Args:
-            dataset_name (str): The new dataset name to set
-        """
-        self.dynamic_exporter.dataset_name = dataset_name
-        logger.debug(f"Updated dynamic exporter's dataset_name to {dataset_name}")
-
-    def _improve_metadata(self, metadata, tracer_type):
-        if metadata is None:
-            metadata = {}
-        metadata.setdefault("log_source", f"{tracer_type}_tracer")
-        metadata.setdefault("recorded_on", str(datetime.datetime.now()))
-        return metadata
-
-
-    def get_upload_status(self):
-        """Check the status of the trace upload."""
-        if self.tracer_type == "langchain" or self.tracer_type == "llamaindex":
-            if self._upload_task is None:
-                return "No upload task in progress."
-            if self._upload_task.done():
-                try:
-                    result = self._upload_task.result()
-                    return f"Upload completed: {result}"
-                except Exception as e:
-                    return f"Upload failed: {str(e)}"
-            return "Upload in progress..."
-
-
-    def _cleanup(self):
-        """
-        Cleans up the tracer by uninstrumenting the instrumentor, shutting down the tracer provider,
-        and resetting the instrumentation flag. This function is called when the tracer is no longer
-        needed.
-
-        Parameters:
-            self (Tracer): The Tracer instance.
-
-        Returns:
-            None
-        """
-        if self.is_instrumented:
-            try:
-                self._instrumentor().uninstrument()
-                self._tracer_provider.shutdown()
-                self.is_instrumented = False
-                print("Tracer provider shut down successfully")
-            except Exception as e:
-                logger.error(f"Error during tracer shutdown: {str(e)}")
-
-        self.is_instrumented = False
-
-    def _pass_user_data(self):
-        user_detail = {
-            "project_name":self.project_name, 
-            "project_id": self.project_id,
-            "dataset_name":self.dataset_name, 
-            "trace_user_detail" : {
-                "project_id": self.project_id,
-                "trace_id": "",
-                "session_id": None,
-                "trace_type": self.tracer_type,
-                "traces": [],
-                "metadata": self.metadata,
-                "pipeline": {
-                    "llm_model": (getattr(self, "pipeline", {}) or {}).get("llm_model", ""),
-                    "vector_store": (getattr(self, "pipeline", {}) or {}).get("vector_store", ""),
-                    "embed_model": (getattr(self, "pipeline", {}) or {}).get("embed_model", "")
-                    }
-                }
-            }
-        return user_detail
-
-    def update_dynamic_exporter(self, **kwargs):
-        """
-        Update the dynamic exporter's properties.
-
-        Args:
-            **kwargs: Keyword arguments to update. Can include any of the following:
-                - files_to_zip: List of files to zip
-                - project_name: Project name
-                - project_id: Project ID
-                - dataset_name: Dataset name
-                - user_details: User details
-                - base_url: Base URL for API
-                - custom_model_cost: Dictionary of custom model costs
-
-        Raises:
-            AttributeError: If the tracer_type is not an agentic tracer or if the dynamic_exporter is not initialized.
-        """
-        if not self.tracer_type.startswith("agentic/") or not hasattr(self, "dynamic_exporter"):
-            logger.error("This method is only available for agentic tracers with a dynamic exporter.")
-
-        for key, value in kwargs.items():
-            if hasattr(self.dynamic_exporter, key):
-                setattr(self.dynamic_exporter, key, value)
-                logger.debug(f"Updated dynamic exporter's {key} to {value}")
-            else:
-                logger.warning(f"Dynamic exporter has no attribute '{key}'")
-
-    def _setup_agentic_tracer(self, instrumentors):
-        from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-        from ragaai_catalyst.tracers.exporters.dynamic_trace_exporter import DynamicTraceExporter
-        from openinference.instrumentation import TracerProvider, TraceConfig
-
-        # Get the code_files
-        self.file_tracker.trace_main_file()
-        list_of_unique_files = self.file_tracker.get_unique_files()
-
-        # Create a dynamic exporter that allows property updates
-        self.dynamic_exporter = DynamicTraceExporter(
-            project_name=self.project_name,
-            dataset_name=self.dataset_name,
-            base_url=self.base_url,
-            tracer_type=self.tracer_type,
-            files_to_zip=list_of_unique_files,
-            project_id=self.project_id,
-            user_details=self.user_details,
-            custom_model_cost=self.model_custom_cost,
-            timeout = self.timeout,
-            post_processor= self.post_processor,
-            max_upload_workers = self.max_upload_workers,
-            user_context = self.user_context,
-            user_gt = self.user_gt,
-            external_id=self.external_id
-        )
+        if self.exporter:
+            self.exporter.post_processor = post_processor_func
         
-        # Set up tracer provider
-        tracer_provider = TracerProvider(config=TraceConfig())
-        tracer_provider.add_span_processor(SimpleSpanProcessor(self.dynamic_exporter))
-        
-        # Instrument all specified instrumentors
-        for instrumentor_class, args in instrumentors:
-            # Create an instance of the instrumentor
-            instrumentor = instrumentor_class()
-            
-            # Uninstrument only if it is already instrumented
-            if isinstance(instrumentor, LangChainInstrumentor) and instrumentor._is_instrumented_by_opentelemetry:
-                instrumentor.uninstrument()
-            
-            # Instrument with the provided tracer provider and arguments
-            instrumentor.instrument(tracer_provider=tracer_provider, *args)
-
-        return tracer_provider.get_tracer(__name__)
-
-    def update_file_list(self):
-        """
-        Update the file list in the dynamic exporter with the latest tracked files.
-        This is useful when new files are added to the project during execution.
-
-        Raises:
-            AttributeError: If the tracer_type is not 'agentic/llamaindex' or if the dynamic_exporter is not initialized.
-        """
-        if not self.tracer_type.startswith("agentic/") or not hasattr(self, "dynamic_exporter"):
-            logger.error("This method is only available for agentic tracers with a dynamic exporter.")
-
-        # Get the latest list of unique files
-        list_of_unique_files = self.file_tracker.get_unique_files()
-
-        # Update the dynamic exporter's files_to_zip property
-        self.dynamic_exporter.files_to_zip = list_of_unique_files
-        logger.debug(f"Updated dynamic exporter's files_to_zip with {len(list_of_unique_files)} files")
+        logger.info(f"Registered post-processor: {post_processor_func.__name__}")
     
-    def add_context(self, context):
+    def set_external_id(self, external_id: str) -> None:
         """
-        Add context information to the trace. This method is only supported for 'langchain' and 'llamaindex' tracer types.
-
-        Args:
-            context: Additional context information to be added to the trace. Can be a string.
-        """
-        if self.tracer_type not in ["langchain", "llamaindex"]:
-            logger.warning("add_context is only supported for 'langchain' and 'llamaindex' tracer types")
-            return
+        Set external ID for subsequent traces.
+        Uses OpenTelemetry context variables to attach to spans.
         
-        if isinstance(context, str):
-            self.dynamic_exporter.user_context = context
-            self.user_context = context
-        else:
-            logger.warning("context must be a string")
+        Args:
+            external_id: External identifier to associate with traces
+        """
+        from ragaai_catalyst.tracers.processors.custom_span_processor import set_trace_config
+        set_trace_config(external_id=external_id)
+        logger.debug(f"Set external_id: {external_id}")
+
+    def set_dataset_name(self, dataset_name: str) -> None:
+        """
+        Update dataset name for subsequent traces.
+        
+        Args:
+            dataset_name: New dataset name
+        """
+        self.dataset_name = dataset_name
+        if self.exporter:
+            self.exporter.dataset_name = dataset_name
+        from ragaai_catalyst.tracers.processors.custom_span_processor import set_trace_config
+        set_trace_config(dataset_name=dataset_name)
+        logger.debug(f"Set dataset_name: {dataset_name}")
+
+    def set_project_name(self, project_name: str) -> None:
+        """
+        Update project name for subsequent traces.
+        
+        Args:
+            project_name: New project name
+        """
+        self.project_name = project_name
+        if self.exporter:
+            self.exporter.project_name = project_name
+        from ragaai_catalyst.tracers.processors.custom_span_processor import set_trace_config
+        set_trace_config(project_name=project_name)
+        logger.debug(f"Set project_name: {project_name}")
     
-    def add_gt(self, gt):
+    def add_context(self, context: str) -> None:
         """
-        Add gt information to the trace. This method is only supported for 'langchain' and 'llamaindex' tracer types.
-
-        Args:
-            gt: gt information to be added to the trace. Can be a string.
-        """
-        if self.tracer_type not in ["langchain", "llamaindex"]:
-            logger.warning("add_gt is only supported for 'langchain' and 'llamaindex' tracer types")
-            return
+        Add context to trace. Only supported for LangChain and LlamaIndex tracers.
+        Uses OpenTelemetry context variables to attach to spans.
         
-        if isinstance(gt, str):
-            self.dynamic_exporter.user_gt = gt
-            self.user_gt = gt
-        else:
-            logger.warning("gt must be a string")
-
-    def add_metadata(self, metadata):
-        """
-        Add metadata information to the trace. If metadata is a dictionary, it will be merged with existing metadata.
-        Non-dictionary metadata or keys not present in the existing metadata will be logged as warnings.
-
         Args:
-            metadata: Additional metadata information to be added to the trace. Should be a dictionary.
+            context: Context string to associate with traces
+            
+        Raises:
+            ValueError: If tracer_type doesn't support context or context is not a string
         """
-        # Convert string metadata to string if needed
+        if self.tracer_type not in TracerTypeSupport.CONTEXT_SUPPORTED:
+            raise ValueError(
+                f"add_context only supported for {', '.join(TracerTypeSupport.CONTEXT_SUPPORTED)}. "
+                f"Current tracer_type: {self.tracer_type}"
+            )
+        
+        if not isinstance(context, str):
+            raise TypeError(f"context must be a string, got {type(context)}")
+        
+        from ragaai_catalyst.tracers.processors.custom_span_processor import set_trace_config
+        set_trace_config(user_context=context)
+        logger.debug(f"Added context: {context[:50]}..." if len(context) > 50 else f"Added context: {context}")
+    
+    def add_gt(self, gt: str) -> None:
+        """
+        Add ground truth to trace. Only supported for LangChain and LlamaIndex tracers.
+        Uses OpenTelemetry context variables to attach to spans.
+        
+        Args:
+            gt: Ground truth string to associate with traces
+            
+        Raises:
+            ValueError: If tracer_type doesn't support ground truth or gt is not a string
+        """
+        if self.tracer_type not in TracerTypeSupport.CONTEXT_SUPPORTED:
+            raise ValueError(
+                f"add_gt only supported for {', '.join(TracerTypeSupport.CONTEXT_SUPPORTED)}. "
+                f"Current tracer_type: {self.tracer_type}"
+            )
+        
+        if not isinstance(gt, str):
+            raise TypeError(f"gt must be a string, got {type(gt)}")
+        
+        from ragaai_catalyst.tracers.processors.custom_span_processor import set_trace_config
+        set_trace_config(user_gt=gt)
+        logger.debug(f"Added ground truth: {gt[:50]}..." if len(gt) > 50 else f"Added ground truth: {gt}")
+
+    def add_metadata(self, metadata: Dict[str, Any]) -> None:
+        """
+        Add or update metadata for traces.
+        
+        Args:
+            metadata: Dictionary of metadata key-value pairs to merge
+            
+        Raises:
+            TypeError: If metadata is not a dictionary
+        """
+        if not isinstance(metadata, dict):
+            raise TypeError(f"metadata must be a dictionary, got {type(metadata)}")
+        
         user_details = self.user_details
         user_metadata = user_details["trace_user_detail"]["metadata"]
-        if isinstance(metadata, dict):
-            for key, value in metadata.items():
-                if key in user_metadata:
-                    user_metadata[key] = value
-                else:
-                    logger.warning(f"Key '{key}' not found in metadata")
-            self.dynamic_exporter.user_details = user_details
-            self.metadata = user_metadata
-        else:
-            logger.warning("metadata must be a dictionary")
-
-    def set_project_name(self, project_name):
+        user_metadata.update(metadata)
+        self.metadata = user_metadata
+        if self.exporter:
+            self.exporter.user_details = self.user_details
+        logger.debug(f"Updated metadata with {len(metadata)} keys")
+    
+    def update_file_list(self) -> None:
         """
-        This method updates the project_name attribute of the dynamic exporter.
+        Update the list of files to be included in trace uploads.
+        
+        Raises:
+            RuntimeError: If exporter is not initialized (tracer_type doesn't require instrumentation)
+        """
+        if not self.exporter:
+            raise RuntimeError(
+                "Exporter not initialized. Ensure tracer_type requires instrumentation "
+                "(e.g., 'langchain', 'openai', 'agentic')"
+            )
+        
+        list_of_unique_files = self.file_tracker.get_unique_files()
+        self.exporter.files_to_zip = list_of_unique_files
+        logger.debug(f"Updated file list: {len(list_of_unique_files)} files")
+    
+    def set_feedback(self, external_id: str, feedback: Any) -> Optional[Dict[str, Any]]:
+        """
+        Submit feedback for a specific trace.
+        
         Args:
-            project_name (str): The new project name to set
+            external_id: External ID of the trace to attach feedback to
+            feedback: Feedback data (can be any JSON-serializable value)
+            
+        Returns:
+            Response data from the API if successful, None otherwise
+            
+        Raises:
+            ValueError: If external_id or feedback is empty
         """
-        self.dynamic_exporter.project_name = project_name
-        logger.debug(f"Updated dynamic exporter's project_name to {project_name}")
-
-    def set_feedback(self, external_id, feedback):
-        """
-        This method updates the feedback on a specifc trace with a given external_id
-        """
+        if not external_id:
+            raise ValueError("external_id is required")
+        if feedback is None or feedback == "":
+            raise ValueError("feedback is required")
+        
         try:
-            if not external_id:
-                logger.error("external_id is required but not provided in set_feedback")
+            api_client = TraceAPIClient(self.base_url, self.project_name, self.timeout)
+            project_id = api_client.get_project_id(self.project_name)
+            
+            if not project_id:
+                logger.error("Failed to get project ID for feedback request")
                 return None
-
-            if not feedback:
-                logger.error("feedback is required but not provided in set_feedback")
-                return None
-
-            base_url = f"{self.base_url}/v1/llm/feedback"
-            headers={
-                        'Accept': 'application/json, text/plain, */*',
-                        'Authorization': f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
-                        'X-Project-Id': str(self.project_id),
-                        'Content-Type': 'application/json'
-                    }
+            
+            url = f"{self.base_url}/v1/llm/feedback"
+            headers = {
+                'Accept': 'application/json, text/plain, */*',
+                'Authorization': f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
+                'X-Project-Id': str(project_id),
+                'Content-Type': 'application/json'
+            }
             payload = json.dumps({
-                    "externalId": str(external_id),
-                    "feedbackColumnName": "_response-feedBack",
-                    "feedback": feedback,
-                    "datasetName": self.dataset_name
-                    })
-
-            response = session_manager.make_request_with_retry("POST", base_url, headers=headers, data=payload, timeout=self.timeout)
-
-            if response.json().get('data', {}).get('status', '') == 200:
-                logger.info(f"{response.json().get('data', {}).get('message', '')} for project {self.project_name} with external_id {external_id}")
+                "externalId": str(external_id),
+                "feedbackColumnName": TracerConstants.FEEDBACK_COLUMN_NAME,
+                "feedback": feedback,
+                "datasetName": self.dataset_name
+            })
+            
+            response = session_manager.make_request_with_retry(
+                "POST", url, headers=headers, data=payload, timeout=self.timeout
+            )
+            
+            if response:
+                logger.info(f"Feedback submitted successfully for external_id: {external_id}")
                 return response.json()
-
-            elif response.json().get('data', {}).get('status', '') == 404:
-                #No externalId found
-                logger.error(response.json().get('data', {}).get('message', ''))
-                return response.json()
-
-            elif response.json().get('status', '') == 400:
-                #Invalid feedback
-                logger.error(response.json().get('message', ''))
-                return response.json()
-
-            elif response.json().get('status', '') == 404:
-                #No Dataset found
-                logger.error(response.json().get('message', ''))
-                return response.json()
-
-
-            else:
-                logger.error("Failed to set feedback")
-                return None
+            return None
+            
         except (PoolError, MaxRetryError, NewConnectionError, ConnectionError, Timeout, RemoteDisconnected) as e:
             session_manager.handle_request_exceptions(e, "setting feedback")
             return None
         except Exception as e:
-            logger.error(f"Error in _set_feedback: {str(e)}")
+            logger.error(f"Error setting feedback: {e}")
             return None
-
+    
     @property
     def tracer(self):
+        """Get the OpenTelemetry tracer instance for manual span creation."""
         return self._tracer
+    
+    def shutdown(self) -> None:
+        """
+        Shutdown the tracer and cleanup resources.
+        
+        This flushes any pending spans and releases OpenTelemetry resources.
+        Should be called when done tracing, or use the context manager pattern.
+        """
+        if self._tracer_provider:
+            try:
+                self._tracer_provider.shutdown()
+                logger.info("Tracer provider shut down successfully")
+            except Exception as e:
+                logger.error(f"Error during tracer shutdown: {e}")
+    
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - automatically shutdown tracer."""
+        self.shutdown()
+        return False
