@@ -95,9 +95,9 @@ class DefaultTraceConverter(TraceConverter):
             root_span = next((span for span in input_trace if span.get('parent_id') is None), None)
             if root_span:
                 attrs = root_span.get('attributes', {})
-                external_id = attrs.get('external_id', external_id)
-                user_context = attrs.get('user_context', user_context)
-                user_gt = attrs.get('user_gt', user_gt)
+                external_id = attrs.get('ragaai.external_id', external_id)
+                user_context = attrs.get('ragaai.user_context', user_context)
+                user_gt = attrs.get('ragaai.user_gt', user_gt)
 
             final_trace = self._create_base_trace(input_trace, external_id)
             spans = self._get_spans(input_trace)

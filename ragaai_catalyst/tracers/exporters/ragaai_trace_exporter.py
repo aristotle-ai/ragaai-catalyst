@@ -177,7 +177,7 @@ class RAGATraceExporter(SpanExporter):
     def _upload_prepared_trace(self, prepared_trace, context: ProcessingContext) -> None:
         """
         Submit prepared trace for upload using type-safe UploadRequest.
-        
+
         Args:
             prepared_trace: PreparedTrace with files ready for upload
             context: ProcessingContext with metadata
@@ -186,11 +186,23 @@ class RAGATraceExporter(SpanExporter):
 
         if self.post_processor:
             try:
-                filepath = self.post_processor(filepath)
+                processed_filepath = self.post_processor(filepath)
+                logger.info(f"Post-processor transformed {filepath} -> {processed_filepath}")
+                filepath = processed_filepath
             except Exception as e:
                 logger.exception(f"Post-processor failed for {prepared_trace.trace_data.trace_id}: {e}")
 
-        upload_request = UploadRequest.from_prepared_trace(prepared_trace, context)
+        # Create upload request with processed filepath
+        upload_request = UploadRequest(
+            trace_file=filepath,
+            code_archive=prepared_trace.code_archive,
+            project_name=context.project_name,
+            dataset_name=context.dataset_name,
+            base_url=context.base_url,
+            tracer_type=context.tracer_type,
+            user_details=context.user_details or {},
+            timeout=context.timeout
+        )
 
         upload_task_id = self.uploader.submit(upload_request)
         logger.info(f"Submitted upload task with ID: {upload_task_id}")

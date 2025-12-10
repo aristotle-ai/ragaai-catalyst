@@ -11,7 +11,7 @@ from llama_index.core.query_engine import RetrieverQueryEngine
 from llama_index.core.postprocessor import MetadataReplacementPostProcessor
 
 from dotenv import load_dotenv
-from ragaai_catalyst import RagaAICatalyst, init_tracing
+from ragaai_catalyst import RagaAICatalyst
 from ragaai_catalyst.tracers import Tracer
 load_dotenv()
 
@@ -27,9 +27,6 @@ tracer = Tracer(
     dataset_name=os.getenv('RAGAAI_DATASET_NAME'),
     tracer_type="agentic/llamaindex",
 )
-
-init_tracing(catalyst=catalyst, tracer=tracer)
-
 DATA_DIR = "legal_data"
 CASES_DIR = os.path.join(DATA_DIR, "cases")
 STATUTES_CSV = os.path.join(DATA_DIR, "statutes.csv")

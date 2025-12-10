@@ -124,7 +124,8 @@ class TraceFormatter:
         converted = self._converter.convert(
             spans,
             context.user_context,
-            context.user_gt
+            context.user_gt,
+            context.external_id
         )
 
         if not converted:
