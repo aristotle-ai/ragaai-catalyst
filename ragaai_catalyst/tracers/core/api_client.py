@@ -163,42 +163,42 @@ class TraceAPIClient:
     def upload_to_presigned_url(self, presigned_url: str, file_path: str) -> bool:
         """
         Upload file to presigned URL (supports S3 and Azure Blob Storage).
-        
+
         Args:
             presigned_url: Presigned URL for upload
             file_path: Path to file to upload
-            
+
         Returns:
             True on success, False on failure
         """
         try:
             with open(file_path, "rb") as f:
                 file_content = f.read()
-            
+
             headers = {"Content-Type": "application/json"}
-            
+
             if "blob.core.windows.net" in presigned_url:
                 headers["x-ms-blob-type"] = "BlockBlob"
                 logger.debug("Detected Azure Blob Storage, added x-ms-blob-type header")
-            
+
             start_time = time.time()
-            response = self.session_manager.make_request_with_retry(
+            response = self.session_manager.make_presigned_request(
                 "PUT", presigned_url, headers=headers, data=file_content, timeout=self.timeout
             )
-            
+
             elapsed_ms = (time.time() - start_time) * 1000
-            
+
             if response.status_code in [200, 201]:
                 logger.info(f"Successfully uploaded file to presigned URL (Time: {elapsed_ms:.2f}ms)")
                 return True
-            
+
             error_detail = response.text[:200] if response.text else "No response body"
             logger.error(
                 f"Failed to upload file: Status {response.status_code} | "
                 f"File: {file_path} | Time: {elapsed_ms:.2f}ms | Response: {error_detail}"
             )
             return False
-                
+
         except FileNotFoundError:
             logger.error(f"File not found: {file_path}")
             return False
@@ -317,43 +317,44 @@ class TraceAPIClient:
     def upload_zip_to_presigned_url(self, presigned_url: str, zip_path: str) -> bool:
         """
         Upload zip file to presigned URL (supports S3 and Azure Blob Storage).
-        
+
         Args:
             presigned_url: Presigned URL for upload
             zip_path: Path to zip file
-            
+
         Returns:
             True on success, False on failure
         """
         try:
             with open(zip_path, "rb") as f:
                 zip_content = f.read()
-            
-            headers = {"Content-Type": "application/zip"}
-            
+
+            # Use application/json for MinIO/S3 to match backend presigned URL signature
+            headers = {"Content-Type": "application/json"}
+
             if "blob.core.windows.net" in presigned_url:
                 headers["x-ms-blob-type"] = "BlockBlob"
                 logger.debug("Detected Azure Blob Storage, added x-ms-blob-type header")
-            
+
             start_time = time.time()
-            response = self.session_manager.make_request_with_retry(
+            response = self.session_manager.make_presigned_request(
                 "PUT", presigned_url, headers=headers, data=zip_content, timeout=self.timeout
             )
             elapsed_ms = (time.time() - start_time) * 1000
-            
-            if response.status_code in [200, 201]:
+
+            if response.status_code in [200, 201, 204]:
                 logger.info(f"Successfully uploaded zip file to presigned URL (Time: {elapsed_ms:.2f}ms)")
                 return True
-            
+
             error_detail = response.text[:200] if response.text else "No response body"
             logger.error(
                 f"Failed to upload zip file: Status {response.status_code} | "
                 f"File: {zip_path} | Time: {elapsed_ms:.2f}ms | Response: {error_detail}"
             )
             return False
-                
-        except FileNotFoundError:
-            logger.error(f"Zip file not found: {zip_path}")
+
+        except FileNotFoundError as e:
+            logger.error(f"Zip file not found: {zip_path} - {e}")
             return False
         except Exception as e:
             logger.error(f"Error uploading zip to presigned URL: {e}")

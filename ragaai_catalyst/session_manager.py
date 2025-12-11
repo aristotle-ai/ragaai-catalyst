@@ -161,6 +161,33 @@ class SessionManager:
                 logger.info(f"Retrying in {wait_time} seconds...")
                 time.sleep(wait_time)
 
+    def make_presigned_request(self, method, url, headers=None, data=None, timeout=None):
+        """
+        Make HTTP request to presigned URL without session-level headers.
+
+        Presigned URLs (S3/MinIO/Azure) are pre-authenticated and require exact
+        header matching with what was signed. Session-level headers like User-Agent
+        and Connection would break the signature validation, so this method uses
+        requests directly to bypass session headers.
+
+        Args:
+            method: HTTP method (GET, PUT, POST, etc.)
+            url: Presigned URL
+            headers: Optional headers dict (only these will be sent)
+            data: Optional request body
+            timeout: Optional timeout in seconds
+
+        Returns:
+            Response object
+
+        Note:
+            This method does NOT use the session's connection pooling or retry logic.
+            It's specifically designed for presigned URL uploads where signature
+            validation is strict.
+        """
+        logger.debug(f"Making presigned URL request: {method} to {url[:100]}...")
+        return requests.request(method, url, headers=headers, data=data, timeout=timeout)
+
 
 # Global session manager instance
 logger.info("Creating global SessionManager instance")

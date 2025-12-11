@@ -57,6 +57,7 @@ def create_dataset_schema_with_trace(
         url_base = os.getenv("RAGAAI_CATALYST_BASE_URL", "https://catalyst.raga.ai/api")
     else:
         url_base = base_url
+    logger.debug(f"Using base URL: {url_base}")
     endpoint = f"{url_base}/v1/llm/dataset/logs"
 
     def _make_request(retry_on_401=True):

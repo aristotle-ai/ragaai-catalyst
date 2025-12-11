@@ -1,9 +1,8 @@
 import logging
 import os
 import re
-import threading
 import time
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 import requests
 
@@ -63,6 +62,7 @@ class RagaAICatalyst:
         self.timeout = self._DEFAULT_TIMEOUT
 
         os.environ["RAGAAI_CATALYST_BASE_URL"] = self.base_url
+        RagaAICatalyst.BASE_URL = self.base_url
 
         AuthManager.initialize(
             access_key=access_key,
