@@ -258,9 +258,6 @@ def _upload_trace_file(task: UploadTask, api_client: TraceAPIClient) -> bool:
             dataset_spans
         )
 
-        if os.getenv("DELETE_RAGAAI_TRACE_JSON", "0") == "1":
-            os.remove(task.filepath)
-
         return response is not None
 
     except Exception as e:
@@ -294,9 +291,6 @@ def _upload_code_archive(task: UploadTask, api_client: TraceAPIClient) -> bool:
             task.hash_id,
             presigned_url
         )
-
-        if os.getenv("DELETE_RAGAAI_TRACE_JSON", "0") == "1":
-            os.remove(task.zip_path)
 
         return response is not None
 
@@ -333,6 +327,18 @@ def _process_upload(task: UploadTask) -> Dict[str, Any]:
 
         if not _upload_code_archive(task, api_client):
             return _fail_task_with_error(result, "Failed to upload code archive", task_id)
+
+        # Cleanup files after successful uploads
+        if os.getenv("DELETE_RAGAAI_TRACE_JSON", "0") == "1":
+            try:
+                if task.filepath and os.path.exists(task.filepath):
+                    os.remove(task.filepath)
+                    logger.info(f"Cleaned up trace file: {task.filepath}")
+                if task.zip_path and os.path.exists(task.zip_path):
+                    os.remove(task.zip_path)
+                    logger.info(f"Cleaned up code archive: {task.zip_path}")
+            except Exception as e:
+                logger.warning(f"Failed to cleanup files: {e}")
 
         return _complete_task_success(result, task_id)
 
