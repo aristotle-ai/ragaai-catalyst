@@ -513,7 +513,7 @@ class PromptManager:
             List of model names, empty list on failure
         """
         base_api_url = os.getenv("RAGAAI_CATALYST_BASE_URL", "https://catalyst.raga.ai/api")
-        models_url = f"{base_api_url}/v1/llm/models"
+        models_url = f"{RagaAICatalyst.BASE_URL}/playground/providers/models/list"
         response = self._make_api_request("POST", models_url, json={"providerName": provider_name})
         
         if response:

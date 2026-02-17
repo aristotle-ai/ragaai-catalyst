@@ -329,7 +329,7 @@ def _process_upload(task: UploadTask) -> Dict[str, Any]:
             return _fail_task_with_error(result, "Failed to upload code archive", task_id)
 
         # Cleanup files after successful uploads
-        if os.getenv("DELETE_RAGAAI_TRACE_JSON", "0") == "1":
+        if os.getenv("DELETE_RAGAAI_TRACE_JSON", "0").lower() in ("1", "true"):
             try:
                 if task.filepath and os.path.exists(task.filepath):
                     os.remove(task.filepath)

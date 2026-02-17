@@ -98,6 +98,9 @@ class Tracer:
         self.exporter = None
         self.user_details = self._build_user_details()
 
+        # Validate project exists before proceeding
+        self._validate_project_exists()
+
         # Initialize instrumentation if needed
         if TracerType.requires_instrumentation(tracer_type):
             self._setup_instrumentation()
@@ -125,6 +128,26 @@ class Tracer:
                 }
             }
         }
+    
+    def _validate_project_exists(self) -> None:
+        """
+        Validate that the project exists in RagaAI Catalyst.
+        
+        Raises:
+            ValueError: If project is not found
+        """
+        try:
+            api_client = TraceAPIClient(self.base_url, self.project_name, self.timeout)
+            if not api_client.validate_project():
+                raise ValueError(
+                    f"Project '{self.project_name}' not found. "
+                    f"Please create the project in RagaAI Catalyst or check the project name."
+                )
+            logger.info(f"Project '{self.project_name}' validated successfully")
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.warning(f"Could not validate project '{self.project_name}': {e}")
     
     def _setup_instrumentation(self):
         from opentelemetry.sdk.trace.export import SimpleSpanProcessor

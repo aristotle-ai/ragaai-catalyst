@@ -89,7 +89,6 @@ class RAGATraceExporter(SpanExporter):
         else:
             self.tmp_dir = Path(tempfile.gettempdir())
 
-        print("tmp directory", self.tmp_dir)
         self._pipeline = TraceExportPipeline(output_dir=self.tmp_dir)
 
     def export(self, spans: Any) -> SpanExportResult:
