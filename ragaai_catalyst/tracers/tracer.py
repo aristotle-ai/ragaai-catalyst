@@ -56,7 +56,7 @@ class Tracer:
         'metadata', 'openinference.span.kind',
         'llm.token_count.prompt', 'llm.token_count.completion', 'llm.token_count.total',
         'input_cost', 'output_cost', 'total_cost',
-        'status_code', 'output.mime_type', 'span_id', 'trace_id'
+        'status_code', 'output.mime_type', 'span_id', 'trace_id', 'session.id', 'user.id'
     })
     
     _PROCESSED_FILE_PREFIX = "processed_"
