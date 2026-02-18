@@ -1,8 +1,8 @@
 import platform
 import psutil
 import sys
-import pkg_resources
 import logging
+from importlib.metadata import distributions
 from typing import Dict, List, Optional
 from ..data.data_structure import (
     SystemInfo,
@@ -55,7 +55,7 @@ class SystemMonitor:
         try:
             # Get Python environment info
             installed_packages = [
-                f"{pkg.key}=={pkg.version}" for pkg in pkg_resources.working_set
+                f"{dist.name}=={dist.version}" for dist in distributions()
             ]
             env_info = EnvironmentInfo(
                 name="Python",
